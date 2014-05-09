@@ -222,7 +222,7 @@ enum Mscale {
 // Specify sensor full scale
 uint8_t Gscale = GFS_250DPS;
 uint8_t Ascale = AFS_2G;
-uint8_t Mscale = MFS_14BITS; // the 16-bit mode does not seem t be supported in the MPU-9250
+uint8_t Mscale = MFS_14BITS; // Choose 14-bit or 16-bit magnetometer resolution
 uint8_t Mmode = 0x02;        // 0x02 for 8 Hz, 0x06 for 100 Hz continuous magnetometer data read
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
@@ -643,7 +643,7 @@ void readMagData(int16_t * destination)
   if(readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01) { // wait for magnetometer data ready bit to be set
   readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);  // Read the six raw data and ST2 registers sequentially into data array
   uint8_t c = rawData[6]; // End data read by reading ST2 register
-    if(!(c && 0x08)) { // Check if magnetic sensor overflow set, if not then report data
+    if(!(c & 0x08)) { // Check if magnetic sensor overflow set, if not then report data
     destination[0] = ((int16_t)rawData[1] << 8) | rawData[0] ;  // Turn the MSB and LSB into a signed 16-bit value
     destination[1] = ((int16_t)rawData[3] << 8) | rawData[2] ;  // Data stored as little Endian
     destination[2] = ((int16_t)rawData[5] << 8) | rawData[4] ; 
@@ -662,25 +662,22 @@ void initAK8963(float * destination)
 {
   // First extract the factory calibration for each magnetometer axis
   uint8_t rawData[3];  // x/y/z gyro calibration data stored here
-  uint8_t high_sensitivity = Mscale << 4;
-  writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00 | high_sensitivity); // Power down magnetometer  
+  writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer  
   delay(10);
-  writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x0F | high_sensitivity); // Enter Fuse ROM access mode
+  writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x0F); // Enter Fuse ROM access mode
   delay(10);
   readBytes(AK8963_ADDRESS, AK8963_ASAX, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
-  destination[0] =  (float)(rawData[0] - 128)/256. + 1.; // Return x-axis sensitivity adjustment values
+  destination[0] =  (float)(rawData[0] - 128)/256. + 1.;   // Return x-axis sensitivity adjustment values, etc.
   destination[1] =  (float)(rawData[1] - 128)/256. + 1.;  
   destination[2] =  (float)(rawData[2] - 128)/256. + 1.; 
-  writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00 | high_sensitivity); // Power down magnetometer  
+  writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer  
   delay(10);
   // Configure the magnetometer for continuous read and highest resolution
-  // set BIT ([4] to 1 (0) to enable 16 (14) bit resolution in CNTL register,
-  // and enable continuous mode data acquisition (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
-//  uint8_t c = (Mscale << 4 | Mmode);
-  writeByte(AK8963_ADDRESS, AK8963_CNTL, Mmode | high_sensitivity); // Set magnetometer data resolution and sample ODR
+  // set Mscale bit 4 to 1 (0) to enable 16 (14) bit resolution in CNTL register,
+  // and enable continuous mode data acquisition Mmode (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
+  writeByte(AK8963_ADDRESS, AK8963_CNTL, Mscale << 4 | Mmode); // Set magnetometer data resolution and sample ODR
   delay(10);
 }
-
 
 void initMPU9250()
 {  
