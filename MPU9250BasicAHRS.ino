@@ -239,8 +239,8 @@ float   temperature;    // Stores the real internal chip temperature in degrees 
 float   SelfTest[6];    // holds results of gyro and accelerometer self test
 
 // global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
-#define GyroMeasError PI * (40.0f / 180.0f)       // gyroscope measurement error in rads/s (shown as 40 deg/s)
-#define GyroMeasDrift PI * (0.0f / 180.0f)      // gyroscope measurement drift in rad/s/s (shown as 0.0 deg/s/s)
+float GyroMeasError = PI * (40.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
+float GyroMeasDrift = PI * (0.0f  / 180.0f);   // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
 // There is a tradeoff in the beta parameter between accuracy and response speed.
 // In the original Madgwick study, beta of 0.041 (corresponding to GyroMeasError of 2.7 degrees/s) was found to give optimal accuracy.
 // However, with this value, the LSM9SD0 response time is about 10 seconds to a stable initial quaternion.
@@ -249,8 +249,8 @@ float   SelfTest[6];    // holds results of gyro and accelerometer self test
 // I haven't noticed any reduction in solution accuracy. This is essentially the I coefficient in a PID control sense; 
 // the bigger the feedback coefficient, the faster the solution converges, usually at the expense of accuracy. 
 // In any case, this is the free parameter in the Madgwick filtering and fusion scheme.
-#define beta sqrt(3.0f / 4.0f) * GyroMeasError   // compute beta
-#define zeta sqrt(3.0f / 4.0f) * GyroMeasDrift   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
+float beta = sqrt(3.0f / 4.0f) * GyroMeasError;   // compute beta
+float zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
 #define Kp 2.0f * 5.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
 #define Ki 0.0f
 
@@ -258,7 +258,7 @@ uint32_t delt_t = 0; // used to control display output rate
 uint32_t count = 0; // used to control display output rate
 float pitch, yaw, roll;
 float deltat = 0.0f;        // integration interval for both filter schemes
-uint32_t lastUpdate = 0; // used to calculate integration interval
+uint32_t lastUpdate = 0, firstUpdate = 0; // used to calculate integration interval
 uint32_t Now = 0;        // used to calculate integration interval
 
 float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor data values 
@@ -318,7 +318,24 @@ void setup()
  
 */
   calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+  display.clearDisplay();
+     
+  display.setCursor(20, 0); display.print("MPU9250 bias");
+  display.setCursor(0, 8); display.print(" x   y   z  ");
 
+  display.setCursor(0,  16); display.print((int)(1000*accelBias[0])); 
+  display.setCursor(24, 16); display.print((int)(1000*accelBias[1])); 
+  display.setCursor(48, 16); display.print((int)(1000*accelBias[2])); 
+  display.setCursor(72, 16); display.print("mg");
+    
+  display.setCursor(0,  24); display.print(gyroBias[0], 1); 
+  display.setCursor(24, 24); display.print(gyroBias[1], 1); 
+  display.setCursor(48, 24); display.print(gyroBias[2], 1); 
+  display.setCursor(66, 24); display.print("o/s");   
+ 
+  display.display();
+  delay(1000); 
+  
   initMPU9250(); 
   Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 
@@ -400,6 +417,9 @@ void loop()
   Now = micros();
   deltat = ((Now - lastUpdate)/1000000.0f); // set integration time by time elapsed since last filter update
   lastUpdate = Now;
+    if(lastUpdate - firstUpdate > 10000000uL) {
+    beta = 0.041;
+  }
   // Sensors x (y)-axis of the accelerometer is aligned with the y (x)-axis of the magnetometer;
   // the magnetometer z-axis (+ down) is opposite to z-axis (+ up) of accelerometer and gyro!
   // We have to make some allowance for this orientationmismatch in feeding the output to the quaternion filter.
@@ -822,14 +842,15 @@ void calibrateMPU9250(float * dest1, float * dest2)
   data[5] = (-gyro_bias[2]/4)       & 0xFF;
   
 // Push gyro biases to hardware registers
-//  writeByte(MPU9250_ADDRESS, XG_OFFSET_H, data[0]);
-//  writeByte(MPU9250_ADDRESS, XG_OFFSET_L, data[1]);
-//  writeByte(MPU9250_ADDRESS, YG_OFFSET_H, data[2]);
-//  writeByte(MPU9250_ADDRESS, YG_OFFSET_L, data[3]);
-//  writeByte(MPU9250_ADDRESS, ZG_OFFSET_H, data[4]);
-//  writeByte(MPU9250_ADDRESS, ZG_OFFSET_L, data[5]);
-
-  dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity; // construct gyro bias in deg/s for later manual subtraction
+  writeByte(MPU9250_ADDRESS, XG_OFFSET_H, data[0]);
+  writeByte(MPU9250_ADDRESS, XG_OFFSET_L, data[1]);
+  writeByte(MPU9250_ADDRESS, YG_OFFSET_H, data[2]);
+  writeByte(MPU9250_ADDRESS, YG_OFFSET_L, data[3]);
+  writeByte(MPU9250_ADDRESS, ZG_OFFSET_H, data[4]);
+  writeByte(MPU9250_ADDRESS, ZG_OFFSET_L, data[5]);
+  
+// Output scaled gyro biases for display in the main program
+  dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity;  
   dest1[1] = (float) gyro_bias[1]/(float) gyrosensitivity;
   dest1[2] = (float) gyro_bias[2]/(float) gyrosensitivity;
 
@@ -839,15 +860,15 @@ void calibrateMPU9250(float * dest1, float * dest2)
 // compensation calculations. Accelerometer bias registers expect bias input as 2048 LSB per g, so that
 // the accelerometer biases calculated above must be divided by 8.
 
-  int16_t accel_bias_reg[3] = {0, 0, 0}; // A place to hold the factory accelerometer trim biases
+  int32_t accel_bias_reg[3] = {0, 0, 0}; // A place to hold the factory accelerometer trim biases
   readBytes(MPU9250_ADDRESS, XA_OFFSET_H, 2, &data[0]); // Read factory accelerometer trim values
-  accel_bias_reg[0] = ((int16_t)data[0] << 8) | data[1];
+  accel_bias_reg[0] = (int16_t) ((int16_t)data[0] << 8) | data[1];
   readBytes(MPU9250_ADDRESS, YA_OFFSET_H, 2, &data[0]);
-  accel_bias_reg[1] = ((int16_t)data[0] << 8) | data[1];
+  accel_bias_reg[1] = (int16_t) ((int16_t)data[0] << 8) | data[1];
   readBytes(MPU9250_ADDRESS, ZA_OFFSET_H, 2, &data[0]);
-  accel_bias_reg[2] = ((int16_t)data[0] << 8) | data[1];
+  accel_bias_reg[2] = (int16_t) ((int16_t)data[0] << 8) | data[1];
   
-  uint16_t mask = 0x0001; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
+  uint32_t mask = 0x0001; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
   uint8_t mask_bit[3] = {0, 0, 0}; // Define array to hold mask bit for each accelerometer bias axis
   
   for(ii = 0; ii < 3; ii++) {
@@ -855,9 +876,9 @@ void calibrateMPU9250(float * dest1, float * dest2)
   }
   
   // Construct total accelerometer bias, including calculated average accelerometer bias from above
-  accel_bias_reg[0] -= (int16_t) (accel_bias[0]/8); // Subtract calculated averaged accelerometer bias scaled to 2048 LSB/g (16 g full scale)
-  accel_bias_reg[1] -= (int16_t) (accel_bias[1]/8);
-  accel_bias_reg[2] -= (int16_t) (accel_bias[2]/8);
+  accel_bias_reg[0] -= (accel_bias[0]/8); // Subtract calculated averaged accelerometer bias scaled to 2048 LSB/g (16 g full scale)
+  accel_bias_reg[1] -= (accel_bias[1]/8);
+  accel_bias_reg[2] -= (accel_bias[2]/8);
   
   data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
   data[1] = (accel_bias_reg[0])      & 0xFF;
@@ -872,14 +893,14 @@ void calibrateMPU9250(float * dest1, float * dest2)
 // Apparently this is not working for the acceleration biases in the MPU-9250
 // Are we handling the temperature correction bit properly?
 // Push accelerometer biases to hardware registers
-//  writeByte(MPU9250_ADDRESS, XA_OFFSET_H, data[0]);
-//  writeByte(MPU9250_ADDRESS, XA_OFFSET_L, data[1]);
-//  writeByte(MPU9250_ADDRESS, YA_OFFSET_H, data[2]);
-//  writeByte(MPU9250_ADDRESS, YA_OFFSET_L, data[3]);
-//  writeByte(MPU9250_ADDRESS, ZA_OFFSET_H, data[4]);
-//  writeByte(MPU9250_ADDRESS, ZA_OFFSET_L, data[5]);
+  writeByte(MPU9250_ADDRESS, XA_OFFSET_H, data[0]);
+  writeByte(MPU9250_ADDRESS, XA_OFFSET_L, data[1]);
+  writeByte(MPU9250_ADDRESS, YA_OFFSET_H, data[2]);
+  writeByte(MPU9250_ADDRESS, YA_OFFSET_L, data[3]);
+  writeByte(MPU9250_ADDRESS, ZA_OFFSET_H, data[4]);
+  writeByte(MPU9250_ADDRESS, ZA_OFFSET_L, data[5]);
 
-// Output scaled accelerometer biases for subtraction in the main program
+// Output scaled accelerometer biases for display in the main program
    dest2[0] = (float)accel_bias[0]/(float)accelsensitivity; 
    dest2[1] = (float)accel_bias[1]/(float)accelsensitivity;
    dest2[2] = (float)accel_bias[2]/(float)accelsensitivity;
