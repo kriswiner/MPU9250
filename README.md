@@ -19,6 +19,7 @@ I added a version of the basic sketch that uses the i2c_t3.h 'Wire' library spec
 I added another version of the sketch intended specifically for the [MPU9250_MS5637 Mini Add-On shield](https://www.tindie.com/products/onehorse/mpu9250-teensy-31-add-on-shields/) for the Teensy 3.1. 
 
 ![](https://d3s5r33r268y59.cloudfront.net/44691/products/thumbs/2014-07-22T02:09:32.088Z-MPU9250micro1.png.114x76_q85_pad_rcrop.png) ![](https://d3s5r33r268y59.cloudfront.net/44691/products/thumbs/2014-07-22T02:00:54.264Z-mpu9250mini1.png.114x76_q85_pad_rcrop.png)
-MPU9250 Micro (left) and Mini add-on shield, which solder onto the bottom pads 23-34 or pins 8 -17 on the Teensy 3.1, respectively.
+
+_MPU9250 Micro (left) and Mini add-on shield, which solder onto the bottom pads 23-34 or pins 8 -17 on the Teensy 3.1, respectively._
 
 It can be simply modified to work with the corresponding micro shield as well. It uses SDA/SCL on pins 17/16, respectively, and it uses the Teensy 3.1-specific Wire library i2c_t3.h. The MS5637 is a simple but high resolution pressure sensor, which can be used in its high resolution mode with power consumption of 20 microAmp, or in a lower resolution mode with power consumption of only 1 microAmp. The choice will depend on the application. The sketch calculates and outputs temperature in degrees Centigrade, pressure in millibar, and altitude in feet. In high resolution mode, the pressure is accurate to within 10 Pa or 0.1 millibar, and the height discrimination is about 13 cm. This is much better performance than achievable from the venerable MPL3115A2 and the MS5637 is in a very small package perfect for the small micro and mini add-on Teensy 3.1 shields.
