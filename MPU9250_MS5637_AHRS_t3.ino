@@ -9,14 +9,14 @@
  allow display to on breadboard monitor. Addition of 9 DoF sensor fusion using open source Madgwick and 
  Mahony filter algorithms. Sketch runs on the 3.3 V 8 MHz Pro Mini and the Teensy 3.1.
  
- This sketch is intended specifically for the MPU9250MS5637 Add-on shield for the Teensy 3.1.
+ This sketch is intended specifically for the MPU9250+MS5637 Add-on shield for the Teensy 3.1.
  It uses SDA/SCL on pins 17/16, respectively, and it uses the Teensy 3.1-specific Wire library i2c_t3.h.
  The MS5637 is a simple but high resolution pressure sensor, which can be used in its high resolution
- mode but with power consumption od 20 microAmp, or in a lower resolution mode with power consumption of
+ mode but with power consumption of 20 microAmp, or in a lower resolution mode with power consumption of
  only 1 microAmp. The choice will depend on the application.
  
  SDA and SCL should have external pull-up resistors (to 3.3V).
- 10k resistors are on the EMSENSR-9250 breakout board.
+ 4K7 resistors are on the MPU9250+MS5637 breakout board.
  
  Hardware setup:
  MPU9250 Breakout --------- Arduino
@@ -38,17 +38,17 @@
 #include <Adafruit_PCD8544.h>
 
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
-// pin 9 - Serial clock out (SCLK)
-// pin 8 - Serial data out (DIN)
-// pin 7 - Data/Command select (D/C)
-// pin 5 - LCD chip select (CS)
-// pin 6 - LCD reset (RST)
-Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
+// pin 7 - Serial clock out (SCLK)
+// pin 6 - Serial data out (DIN)
+// pin 5 - Data/Command select (D/C)
+// pin 3 - LCD chip select (SCE)
+// pin 4 - LCD reset (RST)
+Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 3, 4);
 
 // See MS5637-02BA03 Low Voltage Barometric Pressure Sensor Data Sheet
 #define MS5637_RESET      0x1E
-#define NS5637_CONVERT_D1 0x40
-#define NS5637_CONVERT_D2 0x50
+#define MS5637_CONVERT_D1 0x40
+#define MS5637_CONVERT_D2 0x50
 #define MS5637_ADC_READ   0x00
 
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in 
@@ -200,7 +200,7 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
 #define ZA_OFFSET_H      0x7D
 #define ZA_OFFSET_L      0x7E
 
-// Using the MSENSR-9250 breakout board, ADO is set to 0 
+// Using the MPU9250Teensy 3.1 Add-On shield, ADO is set to 0 
 // Seven-bit device address is 110100 for ADO = 0 and 110101 for ADO = 1
 #define ADO 0
 #if ADO
@@ -213,7 +213,7 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
 #define MS5637_ADDRESS 0x76   // Address of altimeter
 #endif  
 
-#define SerialDebug true   // set to true to get Serial output for debugging
+#define SerialDebug true  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum Ascale {
@@ -253,7 +253,7 @@ uint8_t Mmode = 0x02;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer
 float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
 // Pin definitions
-int intPin = 10;  // These can be changed, 2 and 3 are the Arduinos ext int pins
+int intPin = 8;  // These can be changed, 2 and 3 are the Arduinos ext int pins
 int myLed = 13;
 
 uint16_t Pcal[8];         // calibration constants from MS5637 PROM registers
@@ -263,8 +263,8 @@ double dT, OFFSET, SENS, T2, OFFSET2, SENS2;  // First order and second order co
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
-float magCalibration[3] = {0, 0, 0}, magbias[3] = {0, 0, 0};  // Factory mag calibration and mag bias
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
+float magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
+float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
 int16_t tempCount;            // temperature raw count output
 float   temperature;          // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
 double Temperature, Pressure; // stores MS5637 pressures sensor pressure and temperature
@@ -313,7 +313,7 @@ void setup()
   digitalWrite(myLed, HIGH);
   
   display.begin(); // Initialize the display
-  display.setContrast(58); // Set the contrast
+  display.setContrast(40); // Set the contrast
   
 // Start device display with ID of sensor
   display.clearDisplay();
@@ -356,7 +356,16 @@ void setup()
     Serial.print("z-axis self test: gyration trim within : "); Serial.print(SelfTest[5],1); Serial.println("% of factory value");
     delay(1000);
     
-  calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+   // get sensor resolutions, only need to do this once
+   getAres();
+   getGres();
+   getMres();
+    
+   Serial.println(" Calibrate gyro and accel");
+   accelgyrocalMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+   Serial.println("accel biases (mg)"); Serial.println(1000.*accelBias[0]); Serial.println(1000.*accelBias[1]); Serial.println(1000.*accelBias[2]);
+   Serial.println("gyro biases (dps)"); Serial.println(gyroBias[0]); Serial.println(gyroBias[1]); Serial.println(gyroBias[2]);
+
   display.clearDisplay();
      
   display.setCursor(0, 0); display.print("MPU9250 bias");
@@ -373,8 +382,8 @@ void setup()
   display.setCursor(66, 24); display.print("o/s");   
  
   display.display();
-  delay(1000); 
-  
+  delay(1000);  
+   
   initMPU9250(); 
   Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
   
@@ -393,6 +402,10 @@ void setup()
   // Get magnetometer calibration from AK8963 ROM
   initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
   
+  magcalMPU9250(magBias);
+  Serial.println("mag biases (mG)"); Serial.println(magBias[0]); Serial.println(magBias[1]); Serial.println(magBias[2]); 
+  delay(2000); // add delay to see results before serial spew of data
+   
   if(SerialDebug) {
 //  Serial.println("Calibration values: ");
   Serial.print("X-Axis sensitivity adjustment value "); Serial.println(magCalibration[0], 2);
@@ -425,7 +438,15 @@ void setup()
   Serial.print("C6 = "); Serial.println(Pcal[6]);
   
   nCRC = MS5637checkCRC(Pcal);  //calculate checksum to ensure integrity of MS5637 calibration data
-  Serial.print("Checksum = "); Serial.print(nCRC); Serial.print(" , should be "); Serial.println(refCRC);
+  Serial.print("Checksum = "); Serial.print(nCRC); Serial.print(" , should be "); Serial.println(refCRC);  
+  
+  display.clearDisplay();
+  display.setCursor(20,0); display.print("MS5637");
+  display.setCursor(0,10); display.print("CRC is "); display.setCursor(50,10); display.print(nCRC);
+  display.setCursor(0,20); display.print("Should be "); display.setCursor(50,30); display.print(refCRC);
+  display.display();
+  delay(1000);  
+    
   }
   else
   {
@@ -438,34 +459,29 @@ void setup()
 void loop()
 {  
   // If intPin goes high, all data registers have new data
-  if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+  if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {  // check if data ready interrupt
+ // if (digitalRead(intPin)) {  // On interrupt, read data
     readAccelData(accelCount);  // Read the x/y/z adc values
-    getAres();
-    
+ 
     // Now we'll calculate the accleration value into actual g's
     ax = (float)accelCount[0]*aRes - accelBias[0];  // get actual g value, this depends on scale being set
     ay = (float)accelCount[1]*aRes - accelBias[1];   
     az = (float)accelCount[2]*aRes - accelBias[2];  
    
     readGyroData(gyroCount);  // Read the x/y/z adc values
-    getGres();
- 
+
     // Calculate the gyro value into actual degrees per second
     gx = (float)gyroCount[0]*gRes;  // get actual gyro value, this depends on scale being set
     gy = (float)gyroCount[1]*gRes;  
     gz = (float)gyroCount[2]*gRes;   
   
     readMagData(magCount);  // Read the x/y/z adc values
-    getMres();
-    magbias[0] = 0;//+470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-    magbias[1] = 0;//+120.;  // User environmental x-axis correction in milliGauss
-    magbias[2] = 0;//+125.;  // User environmental x-axis correction in milliGauss
     
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental corrections
-    mx = (float)magCount[0]*mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
-    my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];  
-    mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];   
+    mx = (float)magCount[0]*mRes*magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
+    my = (float)magCount[1]*mRes*magCalibration[1] - magBias[1];  
+    mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];   
   }
   
   Now = micros();
@@ -505,8 +521,8 @@ void loop()
     Serial.print(" qy = "); Serial.print(q[2]); 
     Serial.print(" qz = "); Serial.println(q[3]); 
     }               
-    tempCount = readTempData();  // Read the adc values
-    temperature = ((float) tempCount) / 333.87 + 21.0; // Temperature in degrees Centigrade
+    tempCount = readTempData();  // Read the gyro adc values
+    temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
    // Print temperature in degrees Centigrade      
     Serial.print("Gyro temperature is ");  Serial.print(temperature, 1);  Serial.println(" degrees C"); // Print T values to tenths of s degree C
  
@@ -528,26 +544,22 @@ void loop()
     if(Temperature < 20)                   // correction for low temperature
     {
       T2      = 3*dT*dT/pow(2, 33); 
-      OFFSET2 = 61*(Temperature - 2000)*(Temperature - 2000)/16;
-      SENS2   = 29*(Temperature - 2000)*(Temperature - 2000)/16;
+      OFFSET2 = 61*(100*Temperature - 2000)*(100*Temperature - 2000)/16;
+      SENS2   = 29*(100*Temperature - 2000)*(100*Temperature - 2000)/16;
     } 
     if(Temperature < -15)                      // correction for very low temperature
     {
-      OFFSET2 = OFFSET2 + 17*(Temperature + 1500)*(Temperature + 1500);
-      SENS2 = SENS2 + 9*(Temperature + 1500)*(Temperature + 1500);
+      OFFSET2 = OFFSET2 + 17*(100*Temperature + 1500)*(100*Temperature + 1500);
+      SENS2 = SENS2 + 9*(100*Temperature + 1500)*(100*Temperature + 1500);
     }
  // End of second order corrections
  //
-     Temperature = Temperature - T2;
+     Temperature = Temperature - T2/100;
      OFFSET = OFFSET - OFFSET2;
      SENS = SENS - SENS2;
  
      Pressure = (((D1*SENS)/pow(2, 21) - OFFSET)/pow(2, 15))/100;  // Pressure in mbar or kPa
-
-    Serial.print("Digital temperature value = "); Serial.print( (float)Temperature, 2); Serial.println(" C"); // temperature in degrees Celsius
-    Serial.print("Digital temperature value = "); Serial.print(9.*(float) Temperature/5. + 32., 2); Serial.println(" F"); // temperature in degrees Fahrenheit
-    Serial.print("Digital pressure value = "); Serial.print((float) Pressure, 2);  Serial.println(" mbar");// pressure in millibar
-
+  
     const int station_elevation_m = 1050.0*0.3048; // Accurate for the roof on my house; convert from feet to meters
 
     float baroin = Pressure; // pressure is now in millibars
@@ -564,7 +576,13 @@ void loop()
     baroin = altimeter_setting_pressure_mb * 0.02953;
 
     float altitude = 145366.45*(1. - pow((Pressure/1013.25), 0.190284));
+   
+    if(SerialDebug) {
+    Serial.print("Digital temperature value = "); Serial.print( (float)Temperature, 2); Serial.println(" C"); // temperature in degrees Celsius
+    Serial.print("Digital temperature value = "); Serial.print(9.*(float) Temperature/5. + 32., 2); Serial.println(" F"); // temperature in degrees Fahrenheit
+    Serial.print("Digital pressure value = "); Serial.print((float) Pressure, 2);  Serial.println(" mbar");// pressure in millibar
     Serial.print("Altitude = "); Serial.print(altitude, 2); Serial.println(" feet");
+    }
     
   // Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
   // In this coordinate system, the positive z-axis is down toward Earth. 
@@ -580,7 +598,7 @@ void loop()
     roll  = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
     pitch *= 180.0f / PI;
     yaw   *= 180.0f / PI; 
-    yaw   -= 13.8; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
+    yaw   -= 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
     roll  *= 180.0f / PI;
      
     if(SerialDebug) {
@@ -596,7 +614,7 @@ void loop()
    
     display.clearDisplay();    
  
-    display.setCursor(0, 0); display.print(" x   y   z  ");
+    display.setCursor(0, 0); display.print(" x   y   z ");
 
     display.setCursor(0,  8); display.print((int)(1000*ax)); 
     display.setCursor(24, 8); display.print((int)(1000*ay)); 
@@ -629,7 +647,9 @@ void loop()
     // stabilization control of a fast-moving robot or quadcopter. Compare to the update rate of 200 Hz
     // produced by the on-board Digital Motion Processor of Invensense's MPU6050 6 DoF and MPU9150 9DoF sensors.
     // The 3.3 V 8 MHz Pro Mini is doing pretty well!
-    display.setCursor(0, 40); display.print("rt: "); display.print((float) sumCount / sum, 2); display.print(" Hz"); 
+    display.setCursor(0, 40); display.print(altitude, 0); display.print("ft"); 
+    display.setCursor(68, 0); display.print(9.*Temperature/5. + 32., 0); 
+    display.setCursor(42, 40); display.print((float) sumCount / (1000.*sum), 2); display.print("kHz"); 
     display.display();
 
     digitalWrite(myLed, !digitalRead(myLed));
@@ -822,7 +842,7 @@ void initMPU9250()
 
 // Function which accumulates gyro and accelerometer data after device initialization. It calculates the average
 // of the at-rest readings and then loads the resulting offsets into accelerometer and gyro bias registers.
-void calibrateMPU9250(float * dest1, float * dest2)
+void accelgyrocalMPU9250(float * dest1, float * dest2)
 {  
   uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
   uint16_t ii, packet_count, fifo_count;
@@ -856,7 +876,7 @@ void calibrateMPU9250(float * dest1, float * dest2)
   uint16_t  gyrosensitivity  = 131;   // = 131 LSB/degrees/sec
   uint16_t  accelsensitivity = 16384;  // = 16384 LSB/g
 
-    // Configure FIFO to capture accelerometer and gyro data for bias calculation
+// Configure FIFO to capture accelerometer and gyro data for bias calculation
   writeByte(MPU9250_ADDRESS, USER_CTRL, 0x40);   // Enable FIFO  
   writeByte(MPU9250_ADDRESS, FIFO_EN, 0x78);     // Enable gyro and accelerometer sensors for FIFO  (max size 512 bytes in MPU-9150)
   delay(40); // accumulate 40 samples in 40 milliseconds = 480 bytes
@@ -967,6 +987,43 @@ void calibrateMPU9250(float * dest1, float * dest2)
    dest2[1] = (float)accel_bias[1]/(float)accelsensitivity;
    dest2[2] = (float)accel_bias[2]/(float)accelsensitivity;
 }
+
+
+void magcalMPU9250(float * dest1) 
+{
+  uint16_t ii = 0, sample_count = 0;
+  int32_t mag_bias[3] = {0, 0, 0};
+  int16_t mag_max[3] = {0, 0, 0}, mag_min[3] = {0, 0, 0}, mag_temp[3] = {0, 0, 0};
+ 
+  Serial.println("Mag Calibration: Wave device in a figure eight until done!");
+  delay(4000);
+  
+   sample_count = 64;
+   for(ii = 0; ii < sample_count; ii++) {
+    readMagData(mag_temp);  // Read the mag data   
+    for (int jj = 0; jj < 3; jj++) {
+      if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
+      if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
+    }
+    delay(135);  // at 8 Hz ODR, new mag data is available every 125 ms
+   }
+
+//    Serial.println("mag x min/max:"); Serial.println(mag_max[0]); Serial.println(mag_min[0]);
+//    Serial.println("mag y min/max:"); Serial.println(mag_max[1]); Serial.println(mag_min[1]);
+//    Serial.println("mag z min/max:"); Serial.println(mag_max[2]); Serial.println(mag_min[2]);
+
+    mag_bias[0]  = (mag_max[0] + mag_min[0])/2;  // get average x mag bias in counts
+    mag_bias[1]  = (mag_max[1] + mag_min[1])/2;  // get average y mag bias in counts
+    mag_bias[2]  = (mag_max[2] + mag_min[2])/2;  // get average z mag bias in counts
+    
+    dest1[0] = (float) mag_bias[0]*mRes*magCalibration[0];  // save mag biases in G for main program
+    dest1[1] = (float) mag_bias[1]*mRes*magCalibration[1];   
+    dest1[2] = (float) mag_bias[2]*mRes*magCalibration[2];          
+
+   Serial.println("Mag Calibration done!");
+}
+
+
 
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
 void MPU9250SelfTest(float * destination) // Should return percent deviation from factory trim values, +/- 14 or less deviation is a pass
@@ -1167,4 +1224,5 @@ unsigned char MS5637checkCRC(uint16_t * n_prom)  // calculate checksum from PROM
 	while (Wire.available()) {
         dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
 }
+
 
