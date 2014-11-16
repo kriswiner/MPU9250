@@ -226,7 +226,7 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 3, 4);
 #define LPS25H_ADDRESS 0x5C   // Address of altimeter
 #endif  
 
-#define SerialDebug false  // set to true to get Serial output for debugging
+#define SerialDebug true  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum Ascale {
@@ -255,7 +255,7 @@ enum Pavg {     // Altimeter pressure internal data averaging
   P_avg_8 = 0,  // average pressure data 8 times  
   P_avg_32,     // average pressure data 32 times 
   P_avg_128,    // average pressure data 128 times 
-  P_avg_512     // average pressure data 32 times 
+  P_avg_512     // average pressure data 512 times 
 };
 
 enum Tavg {     // Altimeter temperature internal data averaging
@@ -272,7 +272,7 @@ enum Mscale {
 
 
 // Specify sensor full scale
-uint8_t PODR = P_7Hz, Pavg = P_avg_32, Tavg = T_avg_16;     // set pressure amd temperature output data rate
+uint8_t PODR = P_12Hz, Pavg = P_avg_512, Tavg = T_avg_64;     // set pressure amd temperature output data rate
 uint8_t Gscale = GFS_250DPS;
 uint8_t Ascale = AFS_2G;
 uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
@@ -287,8 +287,8 @@ int myLed = 13;
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
-float magCalibration[3] = {0, 0, 0}, magbias[3] = {0, 0, 0};  // Factory mag calibration and mag bias
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
+float magCalibration[3] = {0, 0, 0};  // Factory mag calibration 
+float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0}; // Bias corrections for gyro, accelerometer, and mag
 int16_t tempCount;           // temperature raw count output
 float gyrotemperature;       // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
 float Temperature, Pressure; // stores LPS25H pressures sensor pressure and temperature
@@ -332,9 +332,7 @@ void setup()
   
   // Set up the interrupt pin, its set as active high, push-pull
   pinMode(intP, INPUT);
-  digitalWrite(intP, LOW);
   pinMode(intG, INPUT);
-  digitalWrite(intG, LOW);
   pinMode(myLed, OUTPUT);
   digitalWrite(myLed, HIGH);
   
@@ -381,8 +379,17 @@ void setup()
     Serial.print("y-axis self test: gyration trim within : "); Serial.print(SelfTest[4],1); Serial.println("% of factory value");
     Serial.print("z-axis self test: gyration trim within : "); Serial.print(SelfTest[5],1); Serial.println("% of factory value");
     delay(1000);
-    
-  calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+
+ // get sensor resolutions, only need to do this once
+   getAres();
+   getGres();
+   getMres();
+
+   Serial.println(" Calibrate gyro and accel");
+   accelgyrocalMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+   Serial.println("accel biases (mg)"); Serial.println(1000.*accelBias[0]); Serial.println(1000.*accelBias[1]); Serial.println(1000.*accelBias[2]);
+   Serial.println("gyro biases (dps)"); Serial.println(gyroBias[0]); Serial.println(gyroBias[1]); Serial.println(gyroBias[2]);
+
   display.clearDisplay();
      
   display.setCursor(0, 0); display.print("MPU9250 bias");
@@ -418,7 +425,11 @@ void setup()
   
   // Get magnetometer calibration from AK8963 ROM
   initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
-  
+
+  magcalMPU9250(magBias);
+  Serial.println("mag biases (mG)"); Serial.println(magBias[0]); Serial.println(magBias[1]); Serial.println(magBias[2]); 
+  delay(2000); // add delay to see results before serial spew of data
+    
   if(SerialDebug) {
 //  Serial.println("Calibration values: ");
   Serial.print("X-Axis sensitivity adjustment value "); Serial.println(magCalibration[0], 2);
@@ -446,16 +457,8 @@ void setup()
   display.display();
   delay(1000); 
   
-  LPS25HInit();  // Initialize lPS25H altimeter
-  
-  // get sensor resolutions, only need to do this once
-   getAres();
-   getGres();
-   getMres();
-   magbias[0] = 0;//+470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-   magbias[1] = 0;//+120.;  // User environmental x-axis correction in milliGauss
-   magbias[2] = 0;//+125.;  // User environmental x-axis correction in milliGauss
-   
+  LPS25HInit();  // Initialize LPS25H altimeter
+     
   }
   else
   {
@@ -488,9 +491,9 @@ void loop()
     
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental corrections
-    mx = (float)magCount[0]*mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
-    my = (float)magCount[1]*mRes*magCalibration[1] - magbias[1];  
-    mz = (float)magCount[2]*mRes*magCalibration[2] - magbias[2];   
+    mx = (float)magCount[0]*mRes*magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
+    my = (float)magCount[1]*mRes*magCalibration[1] - magBias[1];  
+    mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];   
   }
   
   Now = micros();
@@ -837,7 +840,7 @@ void initMPU9250()
 
 // Function which accumulates gyro and accelerometer data after device initialization. It calculates the average
 // of the at-rest readings and then loads the resulting offsets into accelerometer and gyro bias registers.
-void calibrateMPU9250(float * dest1, float * dest2)
+void accelgyrocalMPU9250(float * dest1, float * dest2)
 {  
   uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
   uint16_t ii, packet_count, fifo_count;
@@ -983,6 +986,42 @@ void calibrateMPU9250(float * dest1, float * dest2)
    dest2[2] = (float)accel_bias[2]/(float)accelsensitivity;
 }
 
+
+
+void magcalMPU9250(float * dest1) 
+{
+  uint16_t ii = 0, sample_count = 0;
+  int32_t mag_bias[3] = {0, 0, 0};
+  int16_t mag_max[3] = {0, 0, 0}, mag_min[3] = {0, 0, 0}, mag_temp[3] = {0, 0, 0};
+ 
+  Serial.println("Mag Calibration: Wave device in a figure eight until done!");
+  delay(4000);
+  
+   sample_count = 64;
+   for(ii = 0; ii < sample_count; ii++) {
+    readMagData(mag_temp);  // Read the mag data   
+    for (int jj = 0; jj < 3; jj++) {
+      if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
+      if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
+    }
+    delay(135);  // at 8 Hz ODR, new mag data is available every 125 ms
+   }
+
+//    Serial.println("mag x min/max:"); Serial.println(mag_max[0]); Serial.println(mag_min[0]);
+//    Serial.println("mag y min/max:"); Serial.println(mag_max[1]); Serial.println(mag_min[1]);
+//    Serial.println("mag z min/max:"); Serial.println(mag_max[2]); Serial.println(mag_min[2]);
+
+    mag_bias[0]  = (mag_max[0] + mag_min[0])/2;  // get average x mag bias in counts
+    mag_bias[1]  = (mag_max[1] + mag_min[1])/2;  // get average y mag bias in counts
+    mag_bias[2]  = (mag_max[2] + mag_min[2])/2;  // get average z mag bias in counts
+    
+    dest1[0] = (float) mag_bias[0]*mRes*magCalibration[0];  // save mag biases in G for main program
+    dest1[1] = (float) mag_bias[1]*mRes*magCalibration[1];   
+    dest1[2] = (float) mag_bias[2]*mRes*magCalibration[2];          
+
+   Serial.println("Mag Calibration done!");
+}
+
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
 void MPU9250SelfTest(float * destination) // Should return percent deviation from factory trim values, +/- 14 or less deviation is a pass
 {
@@ -1076,16 +1115,16 @@ void LPS25HInit()
   // set sample rate by setting bits 6:4 
   // enable interrupt circuit by setting bit 3 to one
   // make sure data not updated during read by setting block data more (bit 2) to 1
-//  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG1, 0x80 | PODR << 4 | 0x08 | 0x04);  
-//  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG4, 0x01); // set interrupt pin to signal data ready
-//  writeByte(LPS25H_ADDRESS, LPS25H_RES_CONF, Tavg << 2 | Pavg); // specify temperature and pressure internal averaging
+  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG1, 0x80 | PODR << 4 | 0x08 | 0x04);  
+  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG4, 0x01); // set interrupt pin to signal data ready
+  writeByte(LPS25H_ADDRESS, LPS25H_RES_CONF, Tavg << 2 | Pavg); // specify temperature and pressure internal averaging
 // or use ultra low-power mode
 // To reduce power consumption while keeping a low noise figure, reduce the temperature and pressure averaging
 // and reduce ODR to the minimum and enable the digital filter (FIFO)
-  writeByte(LPS25H_ADDRESS, LPS25H_RES_CONF,  0x05);  // set Tavg = 16 and Pavg = 32 internal averaging
-  writeByte(LPS25H_ADDRESS, LPS25H_FIFO_CTRL, 0xDF);  // set FIFO mean mode with average on two samples or more
-  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG2, 0x21);  // FIFO enabled, decimation disabled
-  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG1, 0x90);  // power on device, set to 1 Hz sample rate
+//  writeByte(LPS25H_ADDRESS, LPS25H_RES_CONF,  0x05);  // set Tavg = 16 and Pavg = 32 internal averaging
+//  writeByte(LPS25H_ADDRESS, LPS25H_FIFO_CTRL, 0xDF);  // set FIFO mean mode with average on two samples or more
+//  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG2, 0x21);  // FIFO enabled, decimation disabled
+//  writeByte(LPS25H_ADDRESS, LPS25H_CTRL_REG1, 0x90);  // power on device, set to 1 Hz sample rate
 }
 
 // I2C read/write functions for the MPU9250, AK8963, and LPS25H sensors
@@ -1123,4 +1162,3 @@ void LPS25HInit()
 	while (Wire.available()) {
         dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
 }
-
