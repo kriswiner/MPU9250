@@ -1002,8 +1002,13 @@ void magcalMPU9250(float * dest1)
    for(ii = 0; ii < sample_count; ii++) {
     readMagData(mag_temp);  // Read the mag data   
     for (int jj = 0; jj < 3; jj++) {
-      if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
-      if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
+      if (ii == 0) {
+        mag_max[jj] = mag_temp[jj]; // Offsets may be large enough that mag_temp[i] may not be bipolar! 
+        mag_min[jj] = mag_temp[jj]; // This prevents max or min being pinned to 0 if the values are unipolar...
+      } else {
+        if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
+        if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
+      }
     }
     delay(135);  // at 8 Hz ODR, new mag data is available every 125 ms
    }
