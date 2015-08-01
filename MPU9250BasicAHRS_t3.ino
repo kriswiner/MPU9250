@@ -600,10 +600,10 @@ void getMres() {
  	// Possible magnetometer scales (and their register bit settings) are:
 	// 14 bit resolution (0) and 16 bit resolution (1)
     case MFS_14BITS:
-          mRes = 10.*4219./8190.; // Proper scale to return milliGauss
+          mRes = 10.*4912./8190.; // Proper scale to return milliGauss
           break;
     case MFS_16BITS:
-          mRes = 10.*4219./32760.0; // Proper scale to return milliGauss
+          mRes = 10.*4912./32760.0; // Proper scale to return milliGauss
           break;
   }
 }
