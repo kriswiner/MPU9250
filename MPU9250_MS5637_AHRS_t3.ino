@@ -264,7 +264,7 @@ int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
 float magCalibration[3] = {0, 0, 0};  // Factory mag calibration and mag bias
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
+float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0}, magBias[3] = {0, 0, 0}, magScale[3]  = {0, 0, 0};      // Bias corrections for gyro and accelerometer
 int16_t tempCount;            // temperature raw count output
 float   temperature;          // Stores the MPU9250 gyro internal chip temperature in degrees Celsius
 double Temperature, Pressure; // stores MS5637 pressures sensor pressure and temperature
@@ -308,7 +308,6 @@ void setup()
   
   // Set up the interrupt pin, its set as active high, push-pull
   pinMode(intPin, INPUT);
-  digitalWrite(intPin, LOW);
   pinMode(myLed, OUTPUT);
   digitalWrite(myLed, HIGH);
   
@@ -331,6 +330,8 @@ void setup()
   display.setTextColor(BLACK); // Set pixel color; 1 on the monochrome screen
   display.clearDisplay();   // clears the screen and buffer
 
+  I2Cscan();// look for I2C devices on the bus
+    
   // Read the WHO_AM_I register, this is a good test of communication
   Serial.println("MPU9250 9-axis motion sensor...");
   byte c = readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
@@ -402,8 +403,9 @@ void setup()
   // Get magnetometer calibration from AK8963 ROM
   initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
   
-  magcalMPU9250(magBias);
-  Serial.println("mag biases (mG)"); Serial.println(magBias[0]); Serial.println(magBias[1]); Serial.println(magBias[2]); 
+  magcalMPU9250(magBias, magScale);
+  Serial.println("AK8963 mag biases (mG)"); Serial.println(magBias[0]); Serial.println(magBias[1]); Serial.println(magBias[2]); 
+  Serial.println("AK8963 mag scale (mG)"); Serial.println(magScale[0]); Serial.println(magScale[1]); Serial.println(magScale[2]); 
   delay(2000); // add delay to see results before serial spew of data
    
   if(SerialDebug) {
@@ -481,7 +483,10 @@ void loop()
     // Include factory calibration per data sheet and user environmental corrections
     mx = (float)magCount[0]*mRes*magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
     my = (float)magCount[1]*mRes*magCalibration[1] - magBias[1];  
-    mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];   
+    mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];  
+    mx *= magScale[0];
+    my *= magScale[1];
+    mz *= magScale[2]; 
   }
   
   Now = micros();
@@ -989,42 +994,51 @@ void accelgyrocalMPU9250(float * dest1, float * dest2)
 }
 
 
-void magcalMPU9250(float * dest1) 
+void magcalMPU9250(float * dest1, float * dest2) 
 {
   uint16_t ii = 0, sample_count = 0;
-  int32_t mag_bias[3] = {0, 0, 0};
-  int16_t mag_max[3] = {0, 0, 0}, mag_min[3] = {0, 0, 0}, mag_temp[3] = {0, 0, 0};
+  int32_t mag_bias[3] = {0, 0, 0}, mag_scale[3] = {0, 0, 0};
+  int16_t mag_max[3] = {0xFF, 0xFF, 0xFF}, mag_min[3] = {0x7F, 0x7F, 0x7F}, mag_temp[3] = {0, 0, 0};
  
   Serial.println("Mag Calibration: Wave device in a figure eight until done!");
   delay(4000);
   
-   sample_count = 64;
+   sample_count = 128;
    for(ii = 0; ii < sample_count; ii++) {
     readMagData(mag_temp);  // Read the mag data   
     for (int jj = 0; jj < 3; jj++) {
-      if (ii == 0) {
-        mag_max[jj] = mag_temp[jj]; // Offsets may be large enough that mag_temp[i] may not be bipolar! 
-        mag_min[jj] = mag_temp[jj]; // This prevents max or min being pinned to 0 if the values are unipolar...
-      } else {
-        if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
-        if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
-      }
+      if(mag_temp[jj] > mag_max[jj]) mag_max[jj] = mag_temp[jj];
+      if(mag_temp[jj] < mag_min[jj]) mag_min[jj] = mag_temp[jj];
     }
-    delay(135);  // at 8 Hz ODR, new mag data is available every 125 ms
-   }
+    if(Mmode == 0x02) delay(135);  // at 8 Hz ODR, new mag data is available every 125 ms
+    if(Mmode == 0x06) delay(12);  // at 100 Hz ODR, new mag data is available every 10 ms
+    }
 
 //    Serial.println("mag x min/max:"); Serial.println(mag_max[0]); Serial.println(mag_min[0]);
 //    Serial.println("mag y min/max:"); Serial.println(mag_max[1]); Serial.println(mag_min[1]);
 //    Serial.println("mag z min/max:"); Serial.println(mag_max[2]); Serial.println(mag_min[2]);
 
+    // Get hard iron correction
     mag_bias[0]  = (mag_max[0] + mag_min[0])/2;  // get average x mag bias in counts
     mag_bias[1]  = (mag_max[1] + mag_min[1])/2;  // get average y mag bias in counts
     mag_bias[2]  = (mag_max[2] + mag_min[2])/2;  // get average z mag bias in counts
     
     dest1[0] = (float) mag_bias[0]*mRes*magCalibration[0];  // save mag biases in G for main program
     dest1[1] = (float) mag_bias[1]*mRes*magCalibration[1];   
-    dest1[2] = (float) mag_bias[2]*mRes*magCalibration[2];          
+    dest1[2] = (float) mag_bias[2]*mRes*magCalibration[2];  
+       
+    // Get soft iron correction estimate
+    mag_scale[0]  = (mag_max[0] - mag_min[0])/2;  // get average x axis max chord length in counts
+    mag_scale[1]  = (mag_max[1] - mag_min[1])/2;  // get average y axis max chord length in counts
+    mag_scale[2]  = (mag_max[2] - mag_min[2])/2;  // get average z axis max chord length in counts
 
+    float avg_rad = mag_scale[0] + mag_scale[1] + mag_scale[2];
+    avg_rad /= 3.0;
+
+    dest2[0] = avg_rad/((float)mag_scale[0]);
+    dest2[1] = avg_rad/((float)mag_scale[1]);
+    dest2[2] = avg_rad/((float)mag_scale[2]);
+  
    Serial.println("Mag Calibration done!");
 }
 
@@ -1194,6 +1208,51 @@ unsigned char MS5637checkCRC(uint16_t * n_prom)  // calculate checksum from PROM
 }
 
 
+// I2C scan function
+
+void I2Cscan()
+{
+// scan for i2c devices
+  byte error, address;
+  int nDevices;
+
+  Serial.println("Scanning...");
+
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) 
+  {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0)
+    {
+      Serial.print("I2C device found at address 0x");
+      if (address<16) 
+        Serial.print("0");
+      Serial.print(address,HEX);
+      Serial.println("  !");
+
+      nDevices++;
+    }
+    else if (error==4) 
+    {
+      Serial.print("Unknow error at address 0x");
+      if (address<16) 
+        Serial.print("0");
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0)
+    Serial.println("No I2C devices found\n");
+  else
+    Serial.println("done\n");
+    
+}
+
+
 // I2C read/write functions for the MPU9250 and AK8963 sensors
 
         void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
@@ -1229,5 +1288,4 @@ unsigned char MS5637checkCRC(uint16_t * n_prom)  // calculate checksum from PROM
 	while (Wire.available()) {
         dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
 }
-
 
