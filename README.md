@@ -1,29 +1,53 @@
-MPU-9250
-========
+MPU-9250 9 DOF IMU Arduino Library
+==================================
 
-Arduino sketch for MPU-9250 9 DoF sensor with AHRS sensor fusion
+![MPU-9250 Breakout](https://cdn.sparkfun.com/r/600-600/assets/learn_tutorials/4/1/8/LSM303C_BOB.jpg)
 
-Demonstrate MPU-9250 basic functionality including parameterizing the register addresses, initializing the sensor, 
-getting properly scaled accelerometer, gyroscope, and magnetometer data out, calibration and self-test of sensors.
-Added display functions to allow display to on-breadboard monitor. Addition of 9 DoF sensor fusion using open source Madgwick and Mahony filter algorithms. Sketch runs on the 3.3 V 8 MHz Pro Mini and the Teensy 3.1.
+[*MPU-9250 Breakout (BOB-13303)*](https://www.sparkfun.com/products/13303)
 
-A discussion of the use and limitations of this sensor and sensor fusion in general is found ![here.]
-(https://github.com/kriswiner/MPU-6050/wiki/Affordable-9-DoF-Sensor-Fusion)
+This is an arduino IDE library to control the MPU-9250.
 
-I have also added a program to allow sensor fusion using the MPU-9250 9-axis motion sensor with the STM32F401 Nucleo board using the mbed compiler. The STM32F401 achieves a sensor fusion filter update rate using the Madgwick MARG fusion filter of 4800 Hz running the M4 Cortex ARM processor at 84 MHz; compare to the sensor fusion update rate of 2120 Hz achieved using the same filter with the Teensy 3.1 running its M4 Cortex ARM processor at 96 MHz.
+This has been tested with Arduino Pro Mini.
 
-One reason for this difference is the single-precision floating point engine embedded in the STM32F401 core. While both ARM processors achieve impressive rates of filtering, really more than necessary for most applications, the factor of two difference translates into much lower power consumption for the same sensor fusion performance. If adequate sensor fusion filtering, say, 1000 Hz, can be achieved at much lower processor clock speed, then over all power consumption will be reduced. This really matters for wearable and other portable motion sensing and control applications.
+Repository Contents
+-------------------
 
-I added a version of the basic sketch that uses the i2c_t3.h 'Wire' library specifically designed for Teensy 3.1. It allows easy access to Teensy-specific  capabilities such as specification of which set of hardware i2c pins will be used, the bus speed (up to 1 MHz!) and also allows master and/or slave designation to handle multiplexing between i2c devices. See www.pjrc.com/teensy and  http://forum.pjrc.com/threads/21680-New-I2C-library-for-Teensy3 for details.
+* **/examples** &mdash; Example sketches for the library (.ino). Run these from the Arduino IDE.
+* **/src** &mdash; Source files for the library (.cpp, .h).
+* **keywords.txt** &mdash; Keywords from this library that will be highlighted in the Arduino IDE.
+* **library.properties** &mdash; General library properties for the Arduino package manager.
 
-I added another version of the sketch intended specifically for the [MPU9250_MS5637 Mini Add-On shield](https://www.tindie.com/products/onehorse/mpu9250-teensy-31-add-on-shields/) for the Teensy 3.1. 
+Example Briefs
+--------------
 
-![](https://d3s5r33r268y59.cloudfront.net/44691/products/thumbs/2014-07-22T02:09:32.088Z-MPU9250micro1.png.114x76_q85_pad_rcrop.png) ![](https://d3s5r33r268y59.cloudfront.net/44691/products/thumbs/2014-07-22T02:00:54.264Z-mpu9250mini1.png.114x76_q85_pad_rcrop.png) ![](https://d3s5r33r268y59.cloudfront.net/44691/products/thumbs/2014-07-22T02:09:32.088Z-mpu9250mini2.png.114x76_q85_pad_rcrop.png)
+* MPU9250BasicAHRS &mdash; Prints out sensor data with some sane default configuration parameters
 
-_MPU9250 + MS5637 Micro (left) and Mini (right) add-on shields, which solder onto the bottom pads 23-34 or pins 8 -17 on the [Teensy 3.1](http://store.oshpark.com/products/teensy-3-1), respectively._
+Documentation
+--------------
 
-It can be simply modified to work with the corresponding micro shield as well. It uses SDA/SCL on pins 17/16, respectively, and it uses the Teensy 3.1-specific Wire library i2c_t3.h. The MS5637 is a simple but high resolution pressure sensor, which can be used in its high resolution mode with power consumption of 20 microAmp, or in a lower resolution mode with power consumption of only 1 microAmp. The choice will depend on the application. The sketch calculates and outputs temperature in degrees Centigrade, pressure in millibar, and altitude in feet. In high resolution mode, the pressure is accurate to within 10 Pa or 0.1 millibar, and the height discrimination is about 13 cm. This is much better performance than achievable from the venerable MPL3115A2 and the MS5637 is in a very small package perfect for the small micro and mini add-on Teensy 3.1 shields.
+* **[Installing an Arduino Library Guide](https://learn.sparkfun.com/tutorials/installing-an-arduino-library)** &mdash; Basic information on how to install an Arduino library.
+* **[Product Repository](https://github.com/sparkfun/MPU-9250_6_DOF_IMU_Breakout)** &mdash; Main repository (including hardware files) for the MPU-9250 Breakout.
+* **[Hookup Guide](https://learn.sparkfun.com/tutorials/MPU-9250-hookup-guide)** &mdash; Basic hookup guide for the MPU-9250 Breakout.
 
-For a discussion of the relative merits of modern board-mounted pressure sensors, see [here](https://github.com/kriswiner/MPU-9250/wiki/Small-pressure-sensors).
+Products that use this Library
+---------------------------------
 
-I added sketches for the various new Mini add-on shields for Teensy 3.1 with the MPU9250 9-axis motion sensor and either the MPL3115A2 or the newer LPS25H pressure sensor/altimeter. Now there are three flavors of 10 DoF Mini add-on boards specially designed for the Teensy 3.1 with state-of-the-art 20-bit (MPL3115A2) and 24-bit (MS5637 and LPS25H) altimeters. The LPS25H has a 32-byte FIFO and sophisticated hardware filtering which allows very low power operation while maintaining 0.01 millibar resolution. This is really quite a feat; this sensor deserves serious consideration for any airborne application you might have in mind.
+* [BOB-13303](https://www.sparkfun.com/products/13339) &mdash; MPU-9250 Breakout board
+
+Version History
+---------------
+
+* [V 1.0.0](https://github.com/sparkfun/SparkFun_MPU-9250_6_DOF_IMU_Breakout_Arduino_Library/releases/tag/V_1.0.0) &mdash; Initial commit of Arduino 1.5+ compatible library.
+
+License Information
+-------------------
+
+This product is _**open source**_!
+
+Code is a lightly modified version of Kris Winer's [code](https://github.com/kriswiner/MPU-9250) which was licensed as Beerware. It's unclear the license of the code in quaternionFilters.ino.
+
+If you have any questions or concerns on licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+
+- Your friends at SparkFun.
