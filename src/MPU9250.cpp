@@ -5,7 +5,7 @@
 //====== and temperature data
 //==============================================================================
 
-void getMres() {
+void MPU9250::getMres() {
   switch (Mscale)
   {
   // Possible magnetometer scales (and their register bit settings) are:
@@ -19,7 +19,7 @@ void getMres() {
   }
 }
 
-void getGres() {
+void MPU9250::getGres() {
   switch (Gscale)
   {
   // Possible gyro scales (and their register bit settings) are:
@@ -40,7 +40,7 @@ void getGres() {
   }
 }
 
-void getAres() {
+void MPU9250::getAres() {
   switch (Ascale)
   {
   // Possible accelerometer scales (and their register bit settings) are:
@@ -62,7 +62,7 @@ void getAres() {
 }
 
 
-void readAccelData(int16_t * destination)
+void MPU9250::readAccelData(int16_t * destination)
 {
   uint8_t rawData[6];  // x/y/z accel register data stored here
   readBytes(MPU9250_ADDRESS, ACCEL_XOUT_H, 6, &rawData[0]);  // Read the six raw data registers into data array
@@ -72,7 +72,7 @@ void readAccelData(int16_t * destination)
 }
 
 
-void readGyroData(int16_t * destination)
+void MPU9250::readGyroData(int16_t * destination)
 {
   uint8_t rawData[6];  // x/y/z gyro register data stored here
   readBytes(MPU9250_ADDRESS, GYRO_XOUT_H, 6, &rawData[0]);  // Read the six raw data registers sequentially into data array
@@ -81,7 +81,7 @@ void readGyroData(int16_t * destination)
   destination[2] = ((int16_t)rawData[4] << 8) | rawData[5] ; 
 }
 
-void readMagData(int16_t * destination)
+void MPU9250::readMagData(int16_t * destination)
 {
   // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of
   // data acquisition
@@ -104,14 +104,14 @@ void readMagData(int16_t * destination)
   }
 }
 
-int16_t readTempData()
+int16_t MPU9250::readTempData()
 {
   uint8_t rawData[2];  // x/y/z gyro register data stored here
   readBytes(MPU9250_ADDRESS, TEMP_OUT_H, 2, &rawData[0]);  // Read the two raw data registers sequentially into data array 
   return ((int16_t)rawData[0] << 8) | rawData[1];  // Turn the MSB and LSB into a 16-bit value
 }
        
-void initAK8963(float * destination)
+void MPU9250::initAK8963(float * destination)
 {
   // First extract the factory calibration for each magnetometer axis
   uint8_t rawData[3];  // x/y/z gyro calibration data stored here
@@ -133,7 +133,7 @@ void initAK8963(float * destination)
 }
 
 
-void initMPU9250()
+void MPU9250::initMPU9250()
 {  
  // wake up device
   writeByte(MPU9250_ADDRESS, PWR_MGMT_1, 0x00); // Clear sleep mode bit (6), enable all sensors 
@@ -192,25 +192,27 @@ void initMPU9250()
 }
 
 
-// Function which accumulates gyro and accelerometer data after device initialization. It calculates the average
-// of the at-rest readings and then loads the resulting offsets into accelerometer and gyro bias registers.
-void calibrateMPU9250(float * dest1, float * dest2)
+// Function which accumulates gyro and accelerometer data after device
+// initialization. It calculates the average of the at-rest readings and then
+// loads the resulting offsets into accelerometer and gyro bias registers.
+void MPU9250::calibrateMPU9250(float * gyroBias, float * accelBias)
 {  
   uint8_t data[12]; // data array to hold accelerometer and gyro x, y, z, data
   uint16_t ii, packet_count, fifo_count;
   int32_t gyro_bias[3]  = {0, 0, 0}, accel_bias[3] = {0, 0, 0};
   
- // reset device
-  writeByte(MPU9250_ADDRESS, PWR_MGMT_1, 0x80); // Write a one to bit 7 reset bit; toggle reset device
+  // reset device
+  // Write a one to bit 7 reset bit; toggle reset device
+  writeByte(MPU9250_ADDRESS, PWR_MGMT_1, 0x80);
   delay(100);
    
- // get stable time source; Auto select clock source to be PLL gyroscope reference if ready 
- // else use the internal oscillator, bits 2:0 = 001
+ // get stable time source; Auto select clock source to be PLL gyroscope
+ // reference if ready else use the internal oscillator, bits 2:0 = 001
   writeByte(MPU9250_ADDRESS, PWR_MGMT_1, 0x01);  
   writeByte(MPU9250_ADDRESS, PWR_MGMT_2, 0x00);
   delay(200);                                    
 
-// Configure device for bias calculation
+  // Configure device for bias calculation
   writeByte(MPU9250_ADDRESS, INT_ENABLE, 0x00);   // Disable all interrupts
   writeByte(MPU9250_ADDRESS, FIFO_EN, 0x00);      // Disable FIFO
   writeByte(MPU9250_ADDRESS, PWR_MGMT_1, 0x00);   // Turn on internal clock source
@@ -284,9 +286,9 @@ void calibrateMPU9250(float * dest1, float * dest2)
   writeByte(MPU9250_ADDRESS, ZG_OFFSET_L, data[5]);
   
 // Output scaled gyro biases for display in the main program
-  dest1[0] = (float) gyro_bias[0]/(float) gyrosensitivity;  
-  dest1[1] = (float) gyro_bias[1]/(float) gyrosensitivity;
-  dest1[2] = (float) gyro_bias[2]/(float) gyrosensitivity;
+  gyroBias[0] = (float) gyro_bias[0]/(float) gyrosensitivity;  
+  gyroBias[1] = (float) gyro_bias[1]/(float) gyrosensitivity;
+  gyroBias[2] = (float) gyro_bias[2]/(float) gyrosensitivity;
 
 // Construct the accelerometer biases for push to the hardware accelerometer bias registers. These registers contain
 // factory trim values which must be added to the calculated accelerometer biases; on boot up these registers will hold
@@ -335,14 +337,14 @@ void calibrateMPU9250(float * dest1, float * dest2)
   writeByte(MPU9250_ADDRESS, ZA_OFFSET_L, data[5]);
 
 // Output scaled accelerometer biases for display in the main program
-   dest2[0] = (float)accel_bias[0]/(float)accelsensitivity; 
-   dest2[1] = (float)accel_bias[1]/(float)accelsensitivity;
-   dest2[2] = (float)accel_bias[2]/(float)accelsensitivity;
+   accelBias[0] = (float)accel_bias[0]/(float)accelsensitivity; 
+   accelBias[1] = (float)accel_bias[1]/(float)accelsensitivity;
+   accelBias[2] = (float)accel_bias[2]/(float)accelsensitivity;
 }
 
    
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
-void MPU9250SelfTest(float * destination) // Should return percent deviation from factory trim values, +/- 14 or less deviation is a pass
+void MPU9250::MPU9250SelfTest(float * destination) // Should return percent deviation from factory trim values, +/- 14 or less deviation is a pass
 {
   uint8_t rawData[6] = {0, 0, 0, 0, 0, 0};
   uint8_t selfTest[6];
@@ -428,7 +430,7 @@ void MPU9250SelfTest(float * destination) // Should return percent deviation fro
 
         
 // Wire.h read and write protocols
-void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
+void MPU9250::writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
 {
   Wire.beginTransmission(address);  // Initialize the Tx buffer
   Wire.write(subAddress);           // Put slave register address in Tx buffer
@@ -436,7 +438,7 @@ void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
   Wire.endTransmission();           // Send the Tx buffer
 }
 
-uint8_t readByte(uint8_t address, uint8_t subAddress)
+uint8_t MPU9250::readByte(uint8_t address, uint8_t subAddress)
 {
   uint8_t data; // `data` will store the register data   
   Wire.beginTransmission(address);         // Initialize the Tx buffer
@@ -447,8 +449,8 @@ uint8_t readByte(uint8_t address, uint8_t subAddress)
   return data;                             // Return data read from slave register
 }
 
-void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t *
-               dest)
+void MPU9250::readBytes(uint8_t address, uint8_t subAddress, uint8_t count,
+                        uint8_t * dest)
 {  
   Wire.beginTransmission(address);   // Initialize the Tx buffer
   Wire.write(subAddress);            // Put slave register address in Tx buffer
