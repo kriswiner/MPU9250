@@ -40,6 +40,9 @@
 Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
 #endif // LCD
 
+#define AHRS true         // Set to false for basic data read
+#define SerialDebug true  // Set to true to get Serial output for debugging
+
 // Pin definitions
 int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
 int myLed  = 13;  // Set up pin 13 led for toggling
@@ -223,8 +226,10 @@ void loop()
     // User environmental x-axis correction in milliGauss, should be
     // automatically calculated
     myIMU.magbias[0] = +470.;
-    myIMU.magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
-    myIMU.magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
+    // User environmental x-axis correction in milliGauss TODO axis??
+    myIMU.magbias[1] = +120.;
+    // User environmental x-axis correction in milliGauss
+    myIMU.magbias[2] = +125.;
 
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental
@@ -238,13 +243,8 @@ void loop()
                myIMU.magbias[2];
   } // if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
 
-  myIMU.Now = micros();
-  // Set integration time by time elapsed since last filter update
-  deltat = ((myIMU.Now - myIMU.lastUpdate)/1000000.0f);
-  myIMU.lastUpdate = myIMU.Now;
-
-  myIMU.sum += deltat; // sum for averaging filter update rate
-  myIMU.sumCount++;
+  // Must be called before updating quaternions!
+  myIMU.updateTime();
 
   // Sensors x (y)-axis of the accelerometer is aligned with the y (x)-axis of
   // the magnetometer; the magnetometer z-axis (+ down) is opposite to z-axis
@@ -255,10 +255,9 @@ void loop()
   // modified to allow any convenient orientation convention. This is ok by
   // aircraft orientation standards! Pass gyro rate as rad/s
 //  MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
-  MahonyQuaternionUpdate(myIMU.ax, myIMU.ay, myIMU.az, myIMU.gx*PI/180.0f,
-                         myIMU.gy*PI/180.0f, myIMU.gz*PI/180.0f, myIMU.my,
-                         myIMU.mx, myIMU.mz, q);
-
+  MahonyQuaternionUpdate(myIMU.ax, myIMU.ay, myIMU.az, myIMU.gx*DEG_TO_RAD,
+                         myIMU.gy*DEG_TO_RAD, myIMU.gz*DEG_TO_RAD, myIMU.my,
+                         myIMU.mx, myIMU.mz, myIMU.deltat);
 
   if (!AHRS)
   {
@@ -284,8 +283,10 @@ void loop()
         Serial.println(" degrees/sec");
 
         // Print mag values in degree/sec
-        Serial.print("X-mag field: "); Serial.print(myIMU.mx); Serial.print(" mG ");
-        Serial.print("Y-mag field: "); Serial.print(myIMU.my); Serial.print(" mG ");
+        Serial.print("X-mag field: "); Serial.print(myIMU.mx);
+        Serial.print(" mG ");
+        Serial.print("Y-mag field: "); Serial.print(myIMU.my);
+        Serial.print(" mG ");
         Serial.print("Z-mag field: "); Serial.print(myIMU.mz);
         Serial.println(" mG");
 
@@ -352,37 +353,46 @@ void loop()
         Serial.print(" mz = "); Serial.print( (int)myIMU.mz );
         Serial.println(" mG");
 
-        Serial.print("q0 = "); Serial.print(q[0]);
-        Serial.print(" qx = "); Serial.print(q[1]);
-        Serial.print(" qy = "); Serial.print(q[2]);
-        Serial.print(" qz = "); Serial.println(q[3]);
+        Serial.print("q0 = "); Serial.print(*getQ());
+        Serial.print(" qx = "); Serial.print(*(getQ() + 1));
+        Serial.print(" qy = "); Serial.print(*(getQ() + 2));
+        Serial.print(" qz = "); Serial.println(*(getQ() + 3));
       }
 
-  // Define output variables from updated quaternion---these are Tait-Bryan
-  // angles, commonly used in aircraft orientation. In this coordinate system,
-  // the positive z-axis is down toward Earth. Yaw is the angle between Sensor
-  // x-axis and Earth magnetic North (or true North if corrected for local
-  // declination, looking down on the sensor positive yaw is counterclockwise.
-  // Pitch is angle between sensor x-axis and Earth ground plane, toward the
-  // Earth is positive, up toward the sky is negative. Roll is angle between
-  // sensor y-axis and Earth ground plane, y-axis up is positive roll. These
-  // arise from the definition of the homogeneous rotation matrix constructed
-  // from quaternions. Tait-Bryan angles as well as Euler angles are
-  // non-commutative; that is, the get the correct orientation the rotations
-  // must be applied in the correct order which for this configuration is yaw,
-  // pitch, and then roll.
-  // For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
-      myIMU.yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] +
-                    q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
-      myIMU.pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
-      myIMU.roll  = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] -
-                    q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
-      myIMU.pitch *= 180.0f / PI;
-      myIMU.yaw   *= 180.0f / PI;
+// Define output variables from updated quaternion---these are Tait-Bryan
+// angles, commonly used in aircraft orientation. In this coordinate system,
+// the positive z-axis is down toward Earth. Yaw is the angle between Sensor
+// x-axis and Earth magnetic North (or true North if corrected for local
+// declination, looking down on the sensor positive yaw is counterclockwise.
+// Pitch is angle between sensor x-axis and Earth ground plane, toward the
+// Earth is positive, up toward the sky is negative. Roll is angle between
+// sensor y-axis and Earth ground plane, y-axis up is positive roll. These
+// arise from the definition of the homogeneous rotation matrix constructed
+// from quaternions. Tait-Bryan angles as well as Euler angles are
+// non-commutative; that is, the get the correct orientation the rotations
+// must be applied in the correct order which for this configuration is yaw,
+// pitch, and then roll.
+// For more see
+// http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+// which has additional links.
+      //myIMU.yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] +
+      myIMU.yaw   = atan2(2.0f * (*(getQ()+1) * *(getQ()+2) + *getQ() *
+                    *(getQ()+3)), *getQ() * *getQ() + *(getQ()+1) * *(getQ()+1)
+                    - *(getQ()+2) * *(getQ()+2) - *(getQ()+3) * *(getQ()+3));
+      myIMU.pitch = -asin(2.0f * (*(getQ()+1) * *(getQ()+3) - *getQ() *
+                    *(getQ()+2)));
+      myIMU.roll  = atan2(2.0f * (*getQ() * *(getQ()+1) + *(getQ()+2) *
+                    *(getQ()+3)), *getQ() * *getQ() - *(getQ()+1) * *(getQ()+1)
+                    - *(getQ()+2) * *(getQ()+2) + *(getQ()+3) * *(getQ()+3));
+      myIMU.pitch *= RAD_TO_DEG;
+      myIMU.yaw   *= RAD_TO_DEG;
 // TODO: Declination at Danville, California is 13 degrees 48 minutes and 47
 //        seconds on 2014-04-04
-      myIMU.yaw   -= 13.8;
-      myIMU.roll  *= 180.0f / PI;
+      // Declination of SparkFun Electronics (40°05'26.6"N 105°11'05.9"W) is
+      // 	8° 30' E  ± 0° 21' (or 8.5°) on 2016-07-19
+      // - http://www.ngdc.noaa.gov/geomag-web/#declination
+      myIMU.yaw   -= 8.5;
+      myIMU.roll  *= RAD_TO_DEG;
 
       if(SerialDebug)
       {
@@ -393,7 +403,8 @@ void loop()
         Serial.print(", ");
         Serial.println(myIMU.roll, 2);
 
-        Serial.print("rate = "); Serial.print((float)myIMU.sumCount/myIMU.sum, 2);
+        Serial.print("rate = ");
+        Serial.print((float)myIMU.sumCount/myIMU.sum, 2);
         Serial.println(" Hz");
       }
 
@@ -438,7 +449,8 @@ void loop()
     // 6 DoF and MPU9150 9DoF sensors. The 3.3 V 8 MHz Pro Mini is doing pretty
     // well!
       display.setCursor(0, 40); display.print("rt: ");
-      display.print((float) myIMU.sumCount / myIMU.sum, 2); display.print(" Hz");
+      display.print((float) myIMU.sumCount / myIMU.sum, 2);
+      display.print(" Hz");
       display.display();
 #endif // LCD
 

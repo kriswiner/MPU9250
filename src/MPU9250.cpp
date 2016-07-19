@@ -110,7 +110,20 @@ int16_t MPU9250::readTempData()
   readBytes(MPU9250_ADDRESS, TEMP_OUT_H, 2, &rawData[0]);  // Read the two raw data registers sequentially into data array 
   return ((int16_t)rawData[0] << 8) | rawData[1];  // Turn the MSB and LSB into a 16-bit value
 }
-       
+
+// Calculate the time the last update took for use in the quaternion filters
+void MPU9250::updateTime()
+{
+  Now = micros();
+  
+  // Set integration time by time elapsed since last filter update
+  deltat = ((Now - lastUpdate) / 1000000.0f);
+  lastUpdate = Now;
+
+  sum += deltat; // sum for averaging filter update rate
+  sumCount++;
+}
+
 void MPU9250::initAK8963(float * destination)
 {
   // First extract the factory calibration for each magnetometer axis
@@ -131,7 +144,6 @@ void MPU9250::initAK8963(float * destination)
   writeByte(AK8963_ADDRESS, AK8963_CNTL, Mscale << 4 | Mmode); // Set magnetometer data resolution and sample ODR
   delay(10);
 }
-
 
 void MPU9250::initMPU9250()
 {  

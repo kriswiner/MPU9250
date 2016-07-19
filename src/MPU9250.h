@@ -177,9 +177,6 @@
 #define AK8963_ADDRESS  0x0C   // Address of magnetometer
 #endif // AD0
 
-#define AHRS true         // Set to false for basic data read
-#define SerialDebug true  // Set to true to get Serial output for debugging
-
 class MPU9250
 {
   protected:
@@ -216,12 +213,13 @@ class MPU9250
     float temperature;   // Stores the real internal chip temperature in Celsius
     int16_t tempCount;   // Temperature raw count output
     uint32_t delt_t = 0; // Used to control display output rate
-    uint32_t count = 0, sumCount = 0; // Used to control display output rate
-    // Used to calculate integration interval
-    uint32_t lastUpdate = 0, firstUpdate = 0;
-    // Integration interval for both filter schemes
-    float sum = 0.0f;
-    uint32_t Now = 0;        // Used to calculate integration interval
+
+    uint32_t count = 0, sumCount = 0; // used to control display output rate
+    // Static so other stuff can use it: MPU9250::deltat
+    float deltat = 0.0f, sum = 0.0f;        // integration interval for both filter schemes
+    uint32_t lastUpdate = 0, firstUpdate = 0; // used to calculate integration interval
+    uint32_t Now = 0;        // used to calculate integration interval
+
     int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
     int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
     // Scale resolutions per LSB for the sensors
@@ -249,6 +247,7 @@ class MPU9250
     void readGyroData(int16_t *);
     void readMagData(int16_t *);
     int16_t readTempData();
+    void updateTime();
     void initAK8963(float *);
     void initMPU9250();
     void calibrateMPU9250(float * gyroBias, float * accelBias);
