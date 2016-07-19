@@ -3,7 +3,7 @@
  date: April 1, 2014
  license: Beerware - Use this code however you'd like. If you
  find it useful you can buy me a beer some time.
- Modified by Brent Wilkins May 31, 2016
+ Modified by Brent Wilkins July 19, 2016
 
  Demonstrate basic MPU-9250 functionality including parameterizing the register
  addresses, initializing the sensor, getting properly scaled accelerometer,
@@ -386,8 +386,6 @@ void loop()
                     - *(getQ()+2) * *(getQ()+2) + *(getQ()+3) * *(getQ()+3));
       myIMU.pitch *= RAD_TO_DEG;
       myIMU.yaw   *= RAD_TO_DEG;
-// TODO: Declination at Danville, California is 13 degrees 48 minutes and 47
-//        seconds on 2014-04-04
       // Declination of SparkFun Electronics (40°05'26.6"N 105°11'05.9"W) is
       // 	8° 30' E  ± 0° 21' (or 8.5°) on 2016-07-19
       // - http://www.ngdc.noaa.gov/geomag-web/#declination
