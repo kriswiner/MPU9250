@@ -375,7 +375,6 @@ void loop()
 // For more see
 // http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
 // which has additional links.
-      //myIMU.yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] +
       myIMU.yaw   = atan2(2.0f * (*(getQ()+1) * *(getQ()+2) + *getQ() *
                     *(getQ()+3)), *getQ() * *getQ() + *(getQ()+1) * *(getQ()+1)
                     - *(getQ()+2) * *(getQ()+2) - *(getQ()+3) * *(getQ()+3));
