@@ -215,8 +215,7 @@ class MPU9250
     uint32_t delt_t = 0; // Used to control display output rate
 
     uint32_t count = 0, sumCount = 0; // used to control display output rate
-    // Static so other stuff can use it: MPU9250::deltat
-    float deltat = 0.0f, sum = 0.0f;        // integration interval for both filter schemes
+    float deltat = 0.0f, sum = 0.0f;  // integration interval for both filter schemes
     uint32_t lastUpdate = 0, firstUpdate = 0; // used to calculate integration interval
     uint32_t Now = 0;        // used to calculate integration interval
 
@@ -233,12 +232,7 @@ class MPU9250
     float SelfTest[6];
     // Stores the 16-bit signed accelerometer sensor output
     int16_t accelCount[3];
-    // Constants for 9 DoF fusion and AHRS (Attitude and Heading
-    // Reference System)
-    // gyroscope measurement error in rads/s (start at 40 deg/s)
     
-  protected:
-
   public:
     void getMres();
     void getGres();
