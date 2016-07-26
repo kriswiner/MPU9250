@@ -1,9 +1,9 @@
 MPU-9250 9 DOF IMU Arduino Library
 ==================================
 
-![MPU-9250 Breakout](https://cdn.sparkfun.com/r/600-600/assets/learn_tutorials/4/1/8/LSM303C_BOB.jpg)
+![MPU-9250 Breakout](https://cdn.sparkfun.com/assets/parts/1/1/3/0/6/13762-00.jpg)](https://cdn.sparkfun.com/assets/parts/1/1/3/0/6/13762-00.jpg)
 
-[*MPU-9250 Breakout (BOB-13303)*](https://www.sparkfun.com/products/13303)
+[*MPU-9250 Breakout (SEN-13762)*](https://www.sparkfun.com/products/13762)
 
 This is an arduino IDE library to control the MPU-9250.
 
@@ -12,7 +12,7 @@ This has been tested with Arduino Pro Mini.
 Repository Contents
 -------------------
 
-* **/examples** &mdash; Example sketches for the library (.ino). Run these from the Arduino IDE.
+* **/examples** &mdash; Example sketch for the library (.ino). Run this from the Arduino IDE.
 * **/src** &mdash; Source files for the library (.cpp, .h).
 * **keywords.txt** &mdash; Keywords from this library that will be highlighted in the Arduino IDE.
 * **library.properties** &mdash; General library properties for the Arduino package manager.
@@ -26,13 +26,15 @@ Documentation
 --------------
 
 * **[Installing an Arduino Library Guide](https://learn.sparkfun.com/tutorials/installing-an-arduino-library)** &mdash; Basic information on how to install an Arduino library.
-* **[Product Repository](https://github.com/sparkfun/MPU-9250_6_DOF_IMU_Breakout)** &mdash; Main repository (including hardware files) for the MPU-9250 Breakout.
+* **[Product Repository](https://github.com/sparkfun/MPU-9250_Breakout)** &mdash; Main repository (including hardware files) for the MPU-9250 Breakout.
+* **[Datasheet](https://cdn.sparkfun.com/assets/learn_tutorials/5/5/0/MPU9250REV1.0.pdf)** &mdash; Datasheet containing part of the product documentation.
+* **[Register map](https://cdn.sparkfun.com/assets/learn_tutorials/5/5/0/MPU-9250-Register-Map.pdf)** &mdash; Register map containing the rest of the product documentation.
 * **[Hookup Guide](https://learn.sparkfun.com/tutorials/MPU-9250-hookup-guide)** &mdash; Basic hookup guide for the MPU-9250 Breakout.
 
 Products that use this Library
 ---------------------------------
 
-* [BOB-13303](https://www.sparkfun.com/products/13339) &mdash; MPU-9250 Breakout board
+* [SEN-13762](https://www.sparkfun.com/products/13762) &mdash; MPU-9250 Breakout board
 
 Version History
 ---------------
