@@ -3,7 +3,7 @@ MPU-9250
 
 Arduino sketch for MPU-9250 9 DoF sensor with AHRS sensor fusion
 
-Most modern and correct version is:  	MPU9250_MS5637_AHRS_t3.ino
+Most modern and correct version is:  	MPU9250_MS5637_AHRS_t3.ino, all require quaternionFilters.ino in the IDE folder also to use the Madgwick and/or Mahony sensor fusion algorithms.
 
 Demonstrate MPU-9250 basic functionality including parameterizing the register addresses, initializing the sensor, 
 getting properly scaled accelerometer, gyroscope, and magnetometer data out, calibration and self-test of sensors.
