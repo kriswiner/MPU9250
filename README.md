@@ -3,6 +3,8 @@ MPU-9250
 
 Arduino sketch for MPU-9250 9 DoF sensor with AHRS sensor fusion
 
+Most modern and correct version is:  	MPU9250_MS5637_AHRS_t3.ino
+
 Demonstrate MPU-9250 basic functionality including parameterizing the register addresses, initializing the sensor, 
 getting properly scaled accelerometer, gyroscope, and magnetometer data out, calibration and self-test of sensors.
 Added display functions to allow display to on-breadboard monitor. Addition of 9 DoF sensor fusion using open source Madgwick and Mahony filter algorithms. Sketch runs on the 3.3 V 8 MHz Pro Mini and the Teensy 3.1.
