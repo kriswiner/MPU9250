@@ -125,9 +125,9 @@ void setup()
     display.setCursor(0, 0); display.print("MPU9250 bias");
     display.setCursor(0, 8); display.print(" x   y   z  ");
 
-    display.setCursor(0,  16); display.print((int)(1000*accelBias[0]));
-    display.setCursor(24, 16); display.print((int)(1000*accelBias[1]));
-    display.setCursor(48, 16); display.print((int)(1000*accelBias[2]));
+    display.setCursor(0,  16); display.print((int)(1000*myIMU.accelBias[0]));
+    display.setCursor(24, 16); display.print((int)(1000*myIMU.accelBias[1]));
+    display.setCursor(48, 16); display.print((int)(1000*myIMU.accelBias[2]));
     display.setCursor(72, 16); display.print("mg");
 
     display.setCursor(0,  24); display.print(myIMU.gyroBias[0], 1);
@@ -162,29 +162,62 @@ void setup()
 #endif // LCD
 
     // Get magnetometer calibration from AK8963 ROM
-    myIMU.initAK8963(myIMU.magCalibration);
+    myIMU.initAK8963(myIMU.factoryMagCalibration);
     // Initialize device for active mode read of magnetometer
     Serial.println("AK8963 initialized for active data mode....");
     if (SerialDebug)
     {
       //  Serial.println("Calibration values: ");
       Serial.print("X-Axis sensitivity adjustment value ");
-      Serial.println(myIMU.magCalibration[0], 2);
+      Serial.println(myIMU.factoryMagCalibration[0], 2);
       Serial.print("Y-Axis sensitivity adjustment value ");
-      Serial.println(myIMU.magCalibration[1], 2);
+      Serial.println(myIMU.factoryMagCalibration[1], 2);
       Serial.print("Z-Axis sensitivity adjustment value ");
-      Serial.println(myIMU.magCalibration[2], 2);
+      Serial.println(myIMU.factoryMagCalibration[2], 2);
     }
 
 #ifdef LCD
     display.clearDisplay();
     display.setCursor(20,0); display.print("AK8963");
     display.setCursor(0,10); display.print("ASAX "); display.setCursor(50,10);
-    display.print(myIMU.magCalibration[0], 2);
+    display.print(myIMU.factoryMagCalibration[0], 2);
     display.setCursor(0,20); display.print("ASAY "); display.setCursor(50,20);
-    display.print(myIMU.magCalibration[1], 2);
+    display.print(myIMU.factoryMagCalibration[1], 2);
     display.setCursor(0,30); display.print("ASAZ "); display.setCursor(50,30);
-    display.print(myIMU.magCalibration[2], 2);
+    display.print(myIMU.factoryMagCalibration[2], 2);
+    display.display();
+    delay(1000);
+#endif // LCD
+
+    myIMU.magCalMPU9250(myIMU.magBias, myIMU.magScale);
+    Serial.println("AK8963 mag biases (mG)"); Serial.println(myIMU.magBias[0]);
+    Serial.println(myIMU.magBias[1]); Serial.println(myIMU.magBias[2]);
+    Serial.println("AK8963 mag scale (mG)"); Serial.println(myIMU.magScale[0]);
+    Serial.println(myIMU.magScale[1]); Serial.println(myIMU.magScale[2]); 
+    delay(2000); // Add delay to see results before serial spew of data
+   
+    if(SerialDebug)
+    {
+      //  Serial.println("Calibration values: ");
+      Serial.println("Magnetometer:");
+      Serial.print("X-Axis sensitivity adjustment value ");
+// TODO: change this from factory to calculated values
+      Serial.println(myIMU.factoryMagCalibration[0], 2);
+      Serial.print("Y-Axis sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[1], 2);
+      Serial.print("Z-Axis sensitivity adjustment value ");
+      Serial.println(myIMU.factoryMagCalibration[2], 2);
+    }
+
+#ifdef LCD
+    display.clearDisplay();
+    display.setCursor(20,0); display.print("AK8963");
+    display.setCursor(0,10); display.print("ASAX "); display.setCursor(50,10);
+    display.print(myIMU.factoryMagCalibration[0], 2);
+    display.setCursor(0,20); display.print("ASAY "); display.setCursor(50,20);
+    display.print(myIMU.factoryMagCalibration[1], 2);
+    display.setCursor(0,30); display.print("ASAZ "); display.setCursor(50,30);
+    display.print(myIMU.factoryMagCalibration[2], 2);
     display.display();
     delay(1000);
 #endif // LCD
@@ -208,9 +241,9 @@ void loop()
 
     // Now we'll calculate the accleration value into actual g's
     // This depends on scale being set
-    myIMU.ax = (float)myIMU.accelCount[0]*myIMU.aRes; // - accelBias[0];
-    myIMU.ay = (float)myIMU.accelCount[1]*myIMU.aRes; // - accelBias[1];
-    myIMU.az = (float)myIMU.accelCount[2]*myIMU.aRes; // - accelBias[2];
+    myIMU.ax = (float)myIMU.accelCount[0]*myIMU.aRes; // - myIMU.accelBias[0];
+    myIMU.ay = (float)myIMU.accelCount[1]*myIMU.aRes; // - myIMU.accelBias[1];
+    myIMU.az = (float)myIMU.accelCount[2]*myIMU.aRes; // - myIMU.accelBias[2];
 
     myIMU.readGyroData(myIMU.gyroCount);  // Read the x/y/z adc values
     myIMU.getGres();
@@ -223,24 +256,28 @@ void loop()
 
     myIMU.readMagData(myIMU.magCount);  // Read the x/y/z adc values
     myIMU.getMres();
+// TODO: This needs to be fixed. No need to hard code it anymore.
     // User environmental x-axis correction in milliGauss, should be
     // automatically calculated
-    myIMU.magbias[0] = +470.;
+    myIMU.magBias[0] = +470.;
     // User environmental x-axis correction in milliGauss TODO axis??
-    myIMU.magbias[1] = +120.;
+    myIMU.magBias[1] = +120.;
     // User environmental x-axis correction in milliGauss
-    myIMU.magbias[2] = +125.;
+    myIMU.magBias[2] = +125.;
 
     // Calculate the magnetometer values in milliGauss
     // Include factory calibration per data sheet and user environmental
     // corrections
     // Get actual magnetometer value, this depends on scale being set
-    myIMU.mx = (float)myIMU.magCount[0]*myIMU.mRes*myIMU.magCalibration[0] -
-               myIMU.magbias[0];
-    myIMU.my = (float)myIMU.magCount[1]*myIMU.mRes*myIMU.magCalibration[1] -
-               myIMU.magbias[1];
-    myIMU.mz = (float)myIMU.magCount[2]*myIMU.mRes*myIMU.magCalibration[2] -
-               myIMU.magbias[2];
+    myIMU.mx =
+      (float)myIMU.magCount[0] * myIMU.mRes*myIMU.factoryMagCalibration[0] -
+      myIMU.magBias[0];
+    myIMU.my =
+      (float)myIMU.magCount[1] * myIMU.mRes*myIMU.factoryMagCalibration[1] -
+      myIMU.magBias[1];
+    myIMU.mz =
+      (float)myIMU.magCount[2] * myIMU.mRes*myIMU.factoryMagCalibration[2] -
+      myIMU.magBias[2];
   } // if (readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01)
 
   // Must be called before updating quaternions!
