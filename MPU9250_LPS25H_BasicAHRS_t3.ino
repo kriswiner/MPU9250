@@ -70,8 +70,8 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(7, 6, 5, 3, 4);
 //
 //Magnetometer Registers
 #define AK8963_ADDRESS   0x0C
-#define WHO_AM_I_AK8963  0x00 // should return 0x48
-#define INFO             0x01
+#define AK8963_WHO_AM_I  0x00 // should return 0x48
+#define AK8963_INFO      0x01
 #define AK8963_ST1       0x02  // data ready status bit 0
 #define AK8963_XOUT_L	 0x03  // data
 #define AK8963_XOUT_H	 0x04
@@ -412,7 +412,7 @@ void setup()
   Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
   
   // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
-  byte d = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for AK8963
+  byte d = readByte(AK8963_ADDRESS, AK8963_WHO_AM_I);  // Read WHO_AM_I register for AK8963
   Serial.print("AK8963 "); Serial.print("I AM "); Serial.print(d, HEX); Serial.print(" I should be "); Serial.println(0x48, HEX);
   display.clearDisplay();
   display.setCursor(20,0); display.print("AK8963");
