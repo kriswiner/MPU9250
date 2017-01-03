@@ -1,7 +1,7 @@
 MPU-9250 9 DOF IMU Arduino Library
 ==================================
 
-![MPU-9250 Breakout](https://cdn.sparkfun.com/assets/parts/1/1/3/0/6/13762-00.jpg)](https://cdn.sparkfun.com/assets/parts/1/1/3/0/6/13762-00.jpg)
+[![MPU-9250 Breakout](https://cdn.sparkfun.com/assets/parts/1/1/3/0/6/13762-00a.jpg)](https://cdn.sparkfun.com/assets/parts/1/1/3/0/6/13762-00a.jpg)
 
 [*MPU-9250 Breakout (SEN-13762)*](https://www.sparkfun.com/products/13762)
 
