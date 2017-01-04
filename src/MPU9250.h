@@ -200,13 +200,19 @@ class MPU9250
       MFS_16BITS      // 0.15 mG per LSB
     };
 
+    enum M_MODE {
+      M_8HZ = 0x02,  // 8 Hz update
+      M_100HZ = 0x06 // 100 Hz continuous magnetometer
+    };
+
+    // TODO: Add setter methods for this hard coded stuff
     // Specify sensor full scale
     uint8_t Gscale = GFS_250DPS;
     uint8_t Ascale = AFS_2G;
     // Choose either 14-bit or 16-bit magnetometer resolution
     uint8_t Mscale = MFS_16BITS;
     // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
-    uint8_t Mmode = 0x02;
+    uint8_t Mmode = M_8HZ;
 
   public:
     float pitch, yaw, roll;
@@ -226,13 +232,16 @@ class MPU9250
     // Variables to hold latest sensor data values
     float ax, ay, az, gx, gy, gz, mx, my, mz;
     // Factory mag calibration and mag bias
-    float magCalibration[3] = {0, 0, 0}, magbias[3] = {0, 0, 0};
-    // Bias corrections for gyro and accelerometer
-    float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};
+    float factoryMagCalibration[3] = {0, 0, 0}, factoryMagBias[3] = {0, 0, 0};
+    // Bias corrections for gyro, accelerometer, and magnetometer
+    float gyroBias[3]  = {0, 0, 0},
+          accelBias[3] = {0, 0, 0},
+          magBias[3]   = {0, 0, 0},
+          magScale[3]  = {0, 0, 0};
     float SelfTest[6];
     // Stores the 16-bit signed accelerometer sensor output
     int16_t accelCount[3];
-    
+
   public:
     void getMres();
     void getGres();
@@ -246,6 +255,7 @@ class MPU9250
     void initMPU9250();
     void calibrateMPU9250(float * gyroBias, float * accelBias);
     void MPU9250SelfTest(float * destination);
+    void magCalMPU9250(float * dest1, float * dest2);
     void writeByte(uint8_t, uint8_t, uint8_t);
     uint8_t readByte(uint8_t, uint8_t);
     void readBytes(uint8_t, uint8_t, uint8_t, uint8_t *);
