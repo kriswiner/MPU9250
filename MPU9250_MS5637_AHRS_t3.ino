@@ -254,7 +254,7 @@ float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
   
 // Pin definitions
 int intPin = 8;  
-bool newData = false;
+volatile bool newData = false;
 bool newMagData = false;
 
 int myLed = 13;
