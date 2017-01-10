@@ -5,6 +5,27 @@
 //====== and temperature data
 //==============================================================================
 
+MPU9250::MPU9250(int8_t cspin /*=NOT_SPI*/) // Uses I2C communication by default
+{
+  // Use hardware SPI communication
+  // If used with sparkfun breakout board
+  // https://www.sparkfun.com/products/13762 , change the pre-soldered JP2 to
+  // enable SPI (solder middle and left instead of middle and right) pads are
+  // very small and re-soldering can be very tricky. I2C highly recommended.
+  if ((cspin > NOT_SPI) && (cspin < NUM_DIGITAL_PINS))
+  {
+    _csPin = cspin;
+    SPI.begin();
+    pinMode(_csPin, OUTPUT);
+    digitalWrite(_csPin, HIGH);
+  }
+  else
+  {
+    _csPin = NOT_SPI;
+    Wire.begin();
+  }
+}
+
 void MPU9250::getMres()
 {
   switch (Mscale)
@@ -473,6 +494,8 @@ void MPU9250::MPU9250SelfTest(float * destination)
   // Get average current values of gyro and acclerometer
   for (int ii = 0; ii < 200; ii++)
   {
+Serial.print("BHW::ii = ");
+Serial.println(ii);
     // Read the six raw data registers into data array
     readBytes(MPU9250_ADDRESS, ACCEL_XOUT_H, 6, &rawData[0]);
     // Turn the MSB and LSB into a signed 16-bit value
@@ -588,8 +611,9 @@ void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
   // Make sure resolution has been calculated
   getMres();
 
-  Serial.println("Mag Calibration: Wave device in a figure 8 until done!");
-  Serial.println(" 4 seconds to get ready followed by 15 seconds of sampling)");
+  Serial.println(F("Mag Calibration: Wave device in a figure 8 until done!"));
+  Serial.println(
+      F("  4 seconds to get ready followed by 15 seconds of sampling)"));
   delay(4000);
 
   // shoot for ~fifteen seconds of mag data
@@ -662,43 +686,130 @@ void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
   scale_dest[1] = avg_rad / ((float)mag_scale[1]);
   scale_dest[2] = avg_rad / ((float)mag_scale[2]);
 
-  Serial.println("Mag Calibration done!");
+  Serial.println(F("Mag Calibration done!"));
 }
 
 // Wire.h read and write protocols
-void MPU9250::writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
+void MPU9250::writeByte(uint8_t deviceAddress, uint8_t registerAddress,
+                        uint8_t data)
 {
-  Wire.beginTransmission(address);  // Initialize the Tx buffer
-  Wire.write(subAddress);           // Put slave register address in Tx buffer
+  if (_csPin != NOT_SPI)
+  {
+    writeByteSPI(registerAddress, data);
+  }
+  else
+  {
+    writeByteWire(deviceAddress,registerAddress, data);
+  }
+}
+
+void MPU9250::writeByteSPI(uint8_t registerAddress, uint8_t data)
+{
+  SPI.beginTransaction(SPISettings(SPI_DATA_RATE, MSBFIRST, SPI_MODE0));
+  digitalWrite(_csPin, LOW);
+  SPI.transfer(registerAddress & ~0x80); // set first bit to 0
+  SPI.transfer(data);
+  digitalWrite(_csPin, HIGH);
+  SPI.endTransaction();
+}
+
+void MPU9250::writeByteWire(uint8_t deviceAddress, uint8_t registerAddress,
+                            uint8_t data)
+{
+  Wire.beginTransmission(deviceAddress);  // Initialize the Tx buffer
+  Wire.write(registerAddress);      // Put slave register address in Tx buffer
   Wire.write(data);                 // Put data in Tx buffer
   Wire.endTransmission();           // Send the Tx buffer
 }
 
-uint8_t MPU9250::readByte(uint8_t address, uint8_t subAddress)
+uint8_t MPU9250::readByte(uint8_t deviceAddress, uint8_t registerAddress)
 {
-  uint8_t data; // `data` will store the register data
-  Wire.beginTransmission(address);  // Initialize the Tx buffer
-  Wire.write(subAddress);           // Put slave register address in Tx buffer
-  Wire.endTransmission(false);      // Send the Tx buffer, but send a restart
-                                    // to keep connection alive
-  Wire.requestFrom(address, (uint8_t) 1); // Read one byte from slave
-                                          // register address
-  data = Wire.read();               // Fill Rx buffer with result
-  return data;                      // Return data read from slave register
+  if (_csPin != NOT_SPI)
+  {
+    return readByteSPI(registerAddress);
+  }
+  else
+  {
+    return readByteWire(deviceAddress, registerAddress);
+  }
 }
 
-void MPU9250::readBytes(uint8_t address, uint8_t subAddress, uint8_t count,
-                        uint8_t * dest)
+uint8_t MPU9250::readByteWire(uint8_t deviceAddress, uint8_t registerAddress)
 {
-  Wire.beginTransmission(address);  // Initialize the Tx buffer
-  Wire.write(subAddress);           // Put slave register address in Tx buffer
-  Wire.endTransmission(false);      // Send the Tx buffer, but send a restart
-                                    // to keep connection alive
-  uint8_t i = 0;
-  Wire.requestFrom(address, count); // Read bytes from slave register address
-  while (Wire.available())
+  uint8_t data; // `data` will store the register data
+
+  // Initialize the Tx buffer
+  Wire.beginTransmission(deviceAddress);
+  // Put slave register address in Tx buffer
+  Wire.write(registerAddress);
+  // Send the Tx buffer, but send a restart to keep connection alive
+  Wire.endTransmission(false);
+  // Read one byte from slave register address
+  Wire.requestFrom(deviceAddress, (uint8_t) 1);
+  // Fill Rx buffer with result
+  data = Wire.read();
+  // Return data read from slave register
+  return data;
+}
+
+uint8_t MPU9250::readByteSPI(uint8_t registerAddress)
+{
+  uint8_t value;
+  SPI.beginTransaction(SPISettings(SPI_DATA_RATE, MSBFIRST, SPI_MODE0));
+  digitalWrite(_csPin, LOW);
+  SPI.transfer(registerAddress | 0x80); // set first bit to 1
+  value = SPI.transfer(0xFF);
+  digitalWrite(_csPin, HIGH);
+  SPI.endTransaction();
+  return value;
+}
+
+void MPU9250::readBytes(uint8_t deviceAddress, uint8_t registerAddress,
+                        uint8_t count, uint8_t * dest)
+{
+  if (_csPin == NOT_SPI)  // Read via I2C
   {
-    // Put read results in the Rx buffer
-    dest[i++] = Wire.read();
+    // Initialize the Tx buffer
+    Wire.beginTransmission(deviceAddress);
+    // Put slave register address in Tx buffer
+    Wire.write(registerAddress);
+    // Send the Tx buffer, but send a restart to keep connection alive
+    Wire.endTransmission(false);
+Serial.print("BHW:: read bytes: 0x");
+    uint8_t i = 0;
+    // Read bytes from slave register address
+    Wire.requestFrom(deviceAddress, count);
+    while (Wire.available())
+    {
+      // Put read results in the Rx buffer
+      dest[i++] = Wire.read();
+Serial.print(dest[i-1], HEX);
+    }
+Serial.print('\n');
+  }
+  else  // Read using SPI
+  {
+    SPI.beginTransaction(SPISettings(SPI_DATA_RATE, MSBFIRST, SPI_MODE0));
+    digitalWrite(_csPin, LOW);
+    SPI.transfer(registerAddress | 0x80); // set first bit to 1
+Serial.print("BHW:: read bytes: ");
+    SPI.transfer(dest, count);
+    /*
+    uint8_t i = 0;
+    while (count > 0)
+    {
+      dest[i++] = SPI.transfer(0xFF);
+Serial.print(dest[i-1], HEX);
+      count--;
+    }
+    */
+    for (int i = 0; i < count; i++)
+    {
+      Serial.print(" 0x");
+      Serial.print(dest[i], HEX);
+    }
+Serial.print('\n');
+    digitalWrite(_csPin, HIGH);
+    SPI.endTransaction(); // Done after de-asserting chip select to free bus
   }
 }

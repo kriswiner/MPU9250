@@ -18,7 +18,7 @@
 
 //Magnetometer Registers
 #define AK8963_ADDRESS   0x0C
-#define WHO_AM_I_AK8963  0x00 // should return 0x48
+#define WHO_AM_I_AK8963  0x00 // (AKA WIA) should return 0x48
 #define INFO             0x01
 #define AK8963_ST1       0x02  // data ready status bit 0
 #define AK8963_XOUT_L    0x03  // data
@@ -177,11 +177,15 @@
 #define AK8963_ADDRESS  0x0C   // Address of magnetometer
 #endif // AD0
 
+#define NOT_SPI -1
+#define SPI_DATA_RATE 1000000 // 1MHz is the max speed of the MPU-9250
+
 class MPU9250
 {
   protected:
     // Set initial input parameters
-    enum Ascale {
+    enum Ascale
+    {
       AFS_2G = 0,
       AFS_4G,
       AFS_8G,
@@ -211,8 +215,17 @@ class MPU9250
     uint8_t Ascale = AFS_2G;
     // Choose either 14-bit or 16-bit magnetometer resolution
     uint8_t Mscale = MFS_16BITS;
+
     // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
     uint8_t Mmode = M_8HZ;
+
+    // SPI chip select pin
+    int8_t _csPin;
+
+    void writeByteWire(uint8_t, uint8_t, uint8_t);
+    void writeByteSPI(uint8_t, uint8_t);
+    uint8_t readByteSPI(uint8_t subAddress);
+    uint8_t readByteWire(uint8_t address, uint8_t subAddress);
 
   public:
     float pitch, yaw, roll;
@@ -238,11 +251,12 @@ class MPU9250
           accelBias[3] = {0, 0, 0},
           magBias[3]   = {0, 0, 0},
           magScale[3]  = {0, 0, 0};
-    float SelfTest[6];
+    float selfTest[6];
     // Stores the 16-bit signed accelerometer sensor output
     int16_t accelCount[3];
 
-  public:
+    // Public method declarations
+    MPU9250(int8_t csPin=NOT_SPI);
     void getMres();
     void getGres();
     void getAres();
@@ -259,6 +273,7 @@ class MPU9250
     void writeByte(uint8_t, uint8_t, uint8_t);
     uint8_t readByte(uint8_t, uint8_t);
     void readBytes(uint8_t, uint8_t, uint8_t, uint8_t *);
+    bool isInI2cMode() { return _csPin == -1; }
 };  // class MPU9250
 
 #endif // _MPU9250_H_
