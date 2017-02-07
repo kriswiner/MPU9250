@@ -11,6 +11,8 @@
 #include <SPI.h>
 #include <Wire.h>
 
+#define SERIAL_DEBUG true
+
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0,
 // RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in above
 // document; the MPU9250 and MPU9150 are virtually identical but the latter has
@@ -18,7 +20,7 @@
 
 //Magnetometer Registers
 #define AK8963_ADDRESS   0x0C
-#define WHO_AM_I_AK8963  0x00 // (AKA WIA) should return 0x48
+#define WHO_AM_I_AK8963  0x49 // (AKA WIA) should return 0x48
 #define INFO             0x01
 #define AK8963_ST1       0x02  // data ready status bit 0
 #define AK8963_XOUT_L    0x03  // data
@@ -177,8 +179,11 @@
 #define AK8963_ADDRESS  0x0C   // Address of magnetometer
 #endif // AD0
 
+#define READ_FLAG 0x80
 #define NOT_SPI -1
 #define SPI_DATA_RATE 1000000 // 1MHz is the max speed of the MPU-9250
+//#define SPI_DATA_RATE 1000000 // 1MHz is the max speed of the MPU-9250
+#define SPI_MODE SPI_MODE3
 
 class MPU9250
 {
@@ -222,10 +227,17 @@ class MPU9250
     // SPI chip select pin
     int8_t _csPin;
 
-    void writeByteWire(uint8_t, uint8_t, uint8_t);
-    void writeByteSPI(uint8_t, uint8_t);
+    uint8_t writeByteWire(uint8_t, uint8_t, uint8_t);
+    uint8_t writeByteSPI(uint8_t, uint8_t);
     uint8_t readByteSPI(uint8_t subAddress);
     uint8_t readByteWire(uint8_t address, uint8_t subAddress);
+    bool magInit();
+    void kickHardware();
+    void select();
+    void deselect();
+// TODO: Remove this next line
+public:
+    uint8_t ak8963WhoAmI_SPI();
 
   public:
     float pitch, yaw, roll;
@@ -270,10 +282,14 @@ class MPU9250
     void calibrateMPU9250(float * gyroBias, float * accelBias);
     void MPU9250SelfTest(float * destination);
     void magCalMPU9250(float * dest1, float * dest2);
-    void writeByte(uint8_t, uint8_t, uint8_t);
+    uint8_t writeByte(uint8_t, uint8_t, uint8_t);
     uint8_t readByte(uint8_t, uint8_t);
-    void readBytes(uint8_t, uint8_t, uint8_t, uint8_t *);
+    uint8_t readBytes(uint8_t, uint8_t, uint8_t, uint8_t *);
+    // TODO: make SPI/Wire private
+    uint8_t readBytesSPI(uint8_t, uint8_t, uint8_t *);
+    uint8_t readBytesWire(uint8_t, uint8_t, uint8_t, uint8_t *);
     bool isInI2cMode() { return _csPin == -1; }
+    bool begin();
 };  // class MPU9250
 
 #endif // _MPU9250_H_

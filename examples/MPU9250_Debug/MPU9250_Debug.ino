@@ -20,6 +20,7 @@ void setup()
   ak8963Init();
   //resetAndWake();
 
+  Serial.println("Calling ak8963WhoAmI()");
   ak8963WhoAmI();
 
   checkSPI();
@@ -222,7 +223,6 @@ uint8_t writeByteSPI(uint8_t registerAddress, uint8_t writeData)
   uint8_t returnVal = SPI.transfer(writeData);
   SPI.endTransaction();
   digitalWrite(CS_PIN, HIGH);
-  delayMicroseconds(50);  // Not used initially, adding during debug
 #ifdef SERIAL_DEBUG
   Serial.print("BHW::writeByteSPI slave returned: 0x");
   Serial.println(returnVal, HEX);
