@@ -20,7 +20,7 @@
 
 //Magnetometer Registers
 #define AK8963_ADDRESS   0x0C
-#define WHO_AM_I_AK8963  0x49 // (AKA WIA) should return 0x48
+#define WHO_AM_I_AK8963  0x00 // (AKA WIA) should return 0x48
 #define INFO             0x01
 #define AK8963_ST1       0x02  // data ready status bit 0
 #define AK8963_XOUT_L    0x03  // data
