@@ -729,11 +729,11 @@ void initMPU9250()
                                     // determined inset in CONFIG above
  
  // Set gyroscope full scale range
- // Range selects FS_SEL and AFS_SEL are 0 - 3, so 2-bit values are left-shifted into positions 4:3
+ // Range selects FS_SEL and GFS_SEL are 0 - 3, so 2-bit values are left-shifted into positions 4:3
   uint8_t c = readByte(MPU9250_ADDRESS, GYRO_CONFIG); // get current GYRO_CONFIG register value
  // c = c & ~0xE0; // Clear self-test bits [7:5] 
-  c = c & ~0x02; // Clear Fchoice bits [1:0] 
-  c = c & ~0x18; // Clear AFS bits [4:3]
+  c = c & ~0x03; // Clear Fchoice bits [1:0] 
+  c = c & ~0x18; // Clear GFS bits [4:3]
   c = c | Gscale << 3; // Set full scale range for the gyro
  // c =| 0x00; // Set Fchoice for the gyro to 11 by writing its inverse to bits 1:0 of GYRO_CONFIG
   writeByte(MPU9250_ADDRESS, GYRO_CONFIG, c ); // Write new GYRO_CONFIG value to register
