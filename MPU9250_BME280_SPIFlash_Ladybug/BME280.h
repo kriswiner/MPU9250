@@ -85,9 +85,9 @@ class BME280
   BME280();
   uint8_t getChipID();
   void resetBME280();
-  uint32_t readBME280Temperature();
-  uint32_t readBME280Pressure();
-  uint16_t readBME280Humidity();
+  int32_t readBME280Temperature();
+  int32_t readBME280Pressure();
+  int16_t readBME280Humidity();
   void BME280Init(uint8_t Posr, uint8_t Hosr, uint8_t Tosr, uint8_t Mode, uint8_t IIRFilter, uint8_t SBy);
   int32_t BME280_compensate_T(int32_t adc_T);
   uint32_t BME280_compensate_P(int32_t adc_P);
