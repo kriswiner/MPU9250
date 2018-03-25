@@ -4,6 +4,7 @@ This fork changes only the MPU9250_BMP280_BasicAHRS_t3.ino to enable use of a NA
 You will need to copy this file and quaternionFilters.ino into a folder to run it.
 
 Nano and Purple Chinese GY-91 Hardware wiring setup:
+
  Nano --------- GY-91
  
  3V3 ----------- 3V3
