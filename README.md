@@ -1,7 +1,7 @@
 MPU-9250 and BMP280
 ========
-This fork changes only the MPU9250_BMP280_BasicAHRS_t3.ino to enable use of a NANO with the chinese (purple) GY-91 board
-You will need to copy this file and quaternionFilters.ino into a folder to run it.
+This fork changes only the MPU9250_BMP280_BasicAHRS_t3.ino to enable use of a NANO with the chinese (purple) GY-91 (=GY91) board.
+You will need to copy both MPU9250_BMP280_BasicAHRS_t3.ino and quaternionFilters.ino into a singlefolder to compile it.
 
 Nano and Purple Chinese GY-91 Hardware wiring setup:
 
@@ -23,6 +23,13 @@ changes from Kris' original:
              Serial.print data in a table format to enable easy comparison of changes
              increase initial USER hard calibation variables
              PS the code looks dramatically messier than the original due to large number of #ifdefs...
+
+I converted this code some time ago to make a sports watch (but they're now so cheap there probably isn't much need). Now wondering about a DIY version of the WOO, Verge, or PIQ for measuring tricks and jumps for kiteboarding, snowboarding, etc as I think £170 is a bit steep for something which could get lost or broken (or made for <£10), and irritatingly the cheap watches don't expose their accelerometers. Of course you could just attaching an old phone to the board, but if not this code can easily be extended to write to SD card or bluetooth to phone with an HC05 or similar breakout.
+Then again using a Teensy 3.x would make the project dramatically more accurate and 3.5/3.6 have an onboard SD slot, so I might just end up back with Kris' original code...
+
+
+
+
 
 The following is forked without change from the original README:
 
