@@ -1,7 +1,24 @@
-MPU-9250
+MPU-9250 and BMP280
 ========
+This fork changes only the MPU9250_BMP280_BasicAHRS_t3.ino to enable use of a NANO with the chinese (purple) GY-91 board
+You will need to copy this file and quaternionFilters.ino into a folder to run it.
 
-Arduino sketch for MPU-9250 9 DoF sensor with AHRS sensor fusion
+Nano and Purple Chinese GY-91 Hardware wiring setup:
+ Nano --------- GY-91
+ 3V3 ----------- 3V3
+ GND ----------- GND
+ A4 (SDA) ------ SDA
+ A5 (SCL) ------ SCL
+
+changes from Kris' original: 
+             update to enable use of Arduino Nano
+             use #def and strings to decrease duplicate code and decrease firmware/on-chip size
+             converted altitude estimation to metres
+             Serial.print data in a table format to enable easy comparison of changes
+             increase initial USER hard calibation variables
+             PS the code looks dramatically messier than the original due to large number of #ifdefs...
+
+The following is forked without change from the original README:
 
 Most modern and correct version is:  	MPU9250_MS5637_AHRS_t3.ino, all require quaternionFilters.ino in the IDE folder also to use the Madgwick and/or Mahony sensor fusion algorithms.
 
