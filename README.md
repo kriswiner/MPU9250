@@ -5,10 +5,15 @@ You will need to copy this file and quaternionFilters.ino into a folder to run i
 
 Nano and Purple Chinese GY-91 Hardware wiring setup:
  Nano --------- GY-91
+ 
  3V3 ----------- 3V3
+ 
  GND ----------- GND
+ 
  A4 (SDA) ------ SDA
+ 
  A5 (SCL) ------ SCL
+ 
 
 changes from Kris' original: 
              update to enable use of Arduino Nano
