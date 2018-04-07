@@ -241,6 +241,7 @@ int16_t MPU9250::readGyroTempData()
        
 void MPU9250::initAK8963(uint8_t Mscale, uint8_t Mmode, float * magCalibration)
 {
+  uint8_t _Mmode = Mmode; // save for later use
   // First extract the factory calibration for each magnetometer axis
   uint8_t rawData[3];  // x/y/z gyro calibration data stored here
   writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer  
