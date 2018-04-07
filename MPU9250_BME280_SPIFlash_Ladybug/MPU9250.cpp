@@ -16,7 +16,6 @@
 
 MPU9250::MPU9250(uint8_t intPin)
 {
-  pinMode(intPin, INPUT);
   _intPin = intPin;
 }
 
