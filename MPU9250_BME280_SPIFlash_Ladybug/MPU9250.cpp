@@ -240,7 +240,7 @@ int16_t MPU9250::readGyroTempData()
   return ((int16_t)rawData[0] << 8) | rawData[1] ;  // Turn the MSB and LSB into a 16-bit value
 }
        
-void MPU9250::initAK8963(uint8_t _Mscale, uint8_t _Mmode, float * _magCalibration)
+void MPU9250::initAK8963(uint8_t Mscale, uint8_t Mmode, float * magCalibration)
 {
   // First extract the factory calibration for each magnetometer axis
   uint8_t rawData[3];  // x/y/z gyro calibration data stored here
@@ -249,15 +249,15 @@ void MPU9250::initAK8963(uint8_t _Mscale, uint8_t _Mmode, float * _magCalibratio
   writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x0F); // Enter Fuse ROM access mode
   delay(10);
   readBytes(AK8963_ADDRESS, AK8963_ASAX, 3, &rawData[0]);  // Read the x-, y-, and z-axis calibration values
-  _magCalibration[0] =  (float)(rawData[0] - 128)/256.0f + 1.0f;   // Return x-axis sensitivity adjustment values, etc.
-  _magCalibration[1] =  (float)(rawData[1] - 128)/256.0f + 1.0f;  
-  _magCalibration[2] =  (float)(rawData[2] - 128)/256.0f + 1.0f; 
+  magCalibration[0] =  (float)(rawData[0] - 128)/256.0f + 1.0f;   // Return x-axis sensitivity adjustment values, etc.
+  magCalibration[1] =  (float)(rawData[1] - 128)/256.0f + 1.0f;  
+  magCalibration[2] =  (float)(rawData[2] - 128)/256.0f + 1.0f; 
   writeByte(AK8963_ADDRESS, AK8963_CNTL, 0x00); // Power down magnetometer  
   delay(10);
   // Configure the magnetometer for continuous read and highest resolution
   // set Mscale bit 4 to 1 (0) to enable 16 (14) bit resolution in CNTL register,
   // and enable continuous mode data acquisition Mmode (bits [3:0]), 0010 for 8 Hz and 0110 for 100 Hz sample rates
-  writeByte(AK8963_ADDRESS, AK8963_CNTL, _Mscale << 4 | _Mmode); // Set magnetometer data resolution and sample ODR
+  writeByte(AK8963_ADDRESS, AK8963_CNTL, Mscale << 4 | Mmode); // Set magnetometer data resolution and sample ODR
   delay(10);
 }
 
