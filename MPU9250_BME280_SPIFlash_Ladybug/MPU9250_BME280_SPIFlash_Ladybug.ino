@@ -147,6 +147,8 @@ void setup()
   // Set up the interrupt pin, it's set as active high, push-pull
   pinMode(myLed, OUTPUT);
   digitalWrite(myLed, HIGH); // start with orange led on (active HIGH)
+ 
+  pinMode(intPin, INPUT);
 
   pinMode(csPin, OUTPUT);
   digitalWrite(csPin, HIGH);
