@@ -19,7 +19,6 @@
 // a different register map
 
 //Magnetometer Registers
-#define AK8963_ADDRESS   0x0C
 #define WHO_AM_I_AK8963  0x00 // (AKA WIA) should return 0x48
 #define INFO             0x01
 #define AK8963_ST1       0x02  // data ready status bit 0
@@ -171,18 +170,16 @@
 
 // Using the MPU-9250 breakout board, ADO is set to 0
 // Seven-bit device address is 110100 for ADO = 0 and 110101 for ADO = 1
-#define ADO 0
-#if ADO
-#define MPU9250_ADDRESS 0x69  // Device address when ADO = 1
-#else
-#define MPU9250_ADDRESS 0x68  // Device address when ADO = 0
+// The previous preprocessor directives were sensitive to the location that the user defined AD1
+// Now simply define MPU9250_ADDRESS as one of the two following depending on your application
+#define MPU9250_ADDRESS_AD1 0x69  // Device address when ADO = 1
+#define MPU9250_ADDRESS_AD0 0x68  // Device address when ADO = 0
 #define AK8963_ADDRESS  0x0C   // Address of magnetometer
-#endif // AD0
+
 
 #define READ_FLAG 0x80
 #define NOT_SPI -1
 #define SPI_DATA_RATE 1000000 // 1MHz is the max speed of the MPU-9250
-//#define SPI_DATA_RATE 1000000 // 1MHz is the max speed of the MPU-9250
 #define SPI_MODE SPI_MODE3
 
 class MPU9250
@@ -214,6 +211,15 @@ class MPU9250
       M_100HZ = 0x06 // 100 Hz continuous magnetometer
     };
 
+    
+    TwoWire * _wire;						// Allows for use of various I2C ports
+    uint8_t _I2Caddr = MPU9250_ADDRESS_AD0;	// Use AD0 by default
+
+ 	SPIClass * _spi;						// Allows for use of different SPI ports
+    int8_t _csPin; 							// SPI chip select pin
+
+    uint32_t _interfaceSpeed;				// Stores the desired I2C or SPi clock rate
+
     // TODO: Add setter methods for this hard coded stuff
     // Specify sensor full scale
     uint8_t Gscale = GFS_250DPS;
@@ -224,8 +230,8 @@ class MPU9250
     // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
     uint8_t Mmode = M_8HZ;
 
-    // SPI chip select pin
-    int8_t _csPin;
+    
+    
 
     uint8_t writeByteWire(uint8_t, uint8_t, uint8_t);
     uint8_t writeByteSPI(uint8_t, uint8_t);
@@ -268,7 +274,8 @@ public:
     int16_t accelCount[3];
 
     // Public method declarations
-    MPU9250(int8_t csPin=NOT_SPI);
+    MPU9250( int8_t _csPin, SPIClass &spiInterface = SPI, uint32_t spi_freq = SPI_DATA_RATE);
+    MPU9250( uint8_t address = MPU9250_ADDRESS_AD0, TwoWire &wirePort = Wire, uint32_t clock_frequency = 100000 );
     void getMres();
     void getGres();
     void getAres();

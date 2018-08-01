@@ -42,7 +42,17 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
 #define AHRS true         // Set to false for basic data read
 #define SERIAL_DEBUG true  // Set to true to get Serial output for debugging
 
-MPU9250 myIMU = MPU9250(2); // Using digital pin to for chip select in demo
+#define SPIport SPI
+#define CSpin 2
+#define SPIrate 1000000
+MPU9250 myIMU = MPU9250(CSpin, SPIport, SPIrate); // Using digital pin to for chip select in demo
+
+
+// Because of the way this library is written you still need to send SOME address - 
+// but in SPI mode it is not used, so I chose over 9000 - By the way if you look closely
+// there will be a truncation warning during compilation because 9001 is too large for 
+// the parameter's type.
+#define MPU9250_ADDRESS 9001
 
 void setup()
 {
