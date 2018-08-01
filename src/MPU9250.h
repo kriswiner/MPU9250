@@ -212,6 +212,10 @@ class MPU9250
       M_100HZ = 0x06 // 100 Hz continuous magnetometer
     };
 
+    uint8_t _I2Caddr = MPU9250_ADDRESS_AD0;	// Use AD0 by default
+    SPIClass * _spi;						// Allows for use of different SPI ports
+    TwoWire * _wire;						// Allows for use of various I2C ports
+
     // TODO: Add setter methods for this hard coded stuff
     // Specify sensor full scale
     uint8_t Gscale = GFS_250DPS;
@@ -266,7 +270,8 @@ public:
     int16_t accelCount[3];
 
     // Public method declarations
-    MPU9250(int8_t csPin=NOT_SPI);
+    MPU9250( int8_t _csPin, SPIClass &spiInterface = SPI);
+    MPU9250( uint8_t address = MPU9250_ADDRESS_AD0, TwoWire &wirePort = Wire, uint32_t clock_frequency = 100000 );
     void getMres();
     void getGres();
     void getAres();
