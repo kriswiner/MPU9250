@@ -5,7 +5,7 @@
 //====== and temperature data
 //==============================================================================
 
-MPU9250::MPU9250( int8_t csPin, SPIClass &spiInterface )
+MPU9250::MPU9250( int8_t csPin, SPIClass &spiInterface, uint32_t spi_freq )
 {
 	// Use hardware SPI communication
   	// If used with sparkfun breakout board
@@ -17,6 +17,8 @@ MPU9250::MPU9250( int8_t csPin, SPIClass &spiInterface )
 	_spi = &spiInterface;
 	_wire = NULL;
 
+	_interfaceSpeed = spi_freq;
+
     _spi->begin();
     pinMode(_csPin, OUTPUT);
     deselect();
@@ -27,10 +29,12 @@ MPU9250::MPU9250( uint8_t address, TwoWire &wirePort, uint32_t clock_frequency )
 	_wire = &wirePort;
 	_spi = NULL;
 
+	_interfaceSpeed = clock_frequency;
+
 	_csPin = NOT_SPI;	// Used to tell the library that the sensor is using I2C
 
 	_wire->begin();
-	_wire->setClock(clock_frequency);
+	_wire->setClock(_interfaceSpeed);
 }
 
 void MPU9250::getMres()
@@ -612,8 +616,8 @@ void MPU9250::magCalMPU9250(float * bias_dest, float * scale_dest)
   uint16_t ii = 0, sample_count = 0;
   int32_t mag_bias[3]  = {0, 0, 0},
           mag_scale[3] = {0, 0, 0};
-  int16_t mag_max[3]  = {0x8000, 0x8000, 0x8000},
-          mag_min[3]  = {0x7FFF, 0x7FFF, 0x7FFF},
+  int16_t mag_max[3]  = {-32768, -32768, -32768},		// Wrote out decimal (signed) values to remove a conversion warning
+          mag_min[3]  = {32767, 32767, 32767},
           mag_temp[3] = {0, 0, 0};
 
   // Make sure resolution has been calculated
@@ -715,7 +719,7 @@ uint8_t MPU9250::writeByteSPI(uint8_t registerAddress, uint8_t writeData)
 {
   uint8_t returnVal;
 
-  _spi->beginTransaction(SPISettings(SPI_DATA_RATE, MSBFIRST, SPI_MODE));
+  _spi->beginTransaction(SPISettings(_interfaceSpeed, MSBFIRST, SPI_MODE));
   select();
 
   _spi->transfer(registerAddress);
@@ -733,12 +737,14 @@ uint8_t MPU9250::writeByteSPI(uint8_t registerAddress, uint8_t writeData)
 uint8_t MPU9250::writeByteWire(uint8_t deviceAddress, uint8_t registerAddress,
                             uint8_t data)
 {
-  _wire->beginTransmission(deviceAddress);  // Initialize the Tx buffer
-  _wire->write(registerAddress);      // Put slave register address in Tx buffer
-  _wire->write(data);                 // Put data in Tx buffer
-  _wire->endTransmission();           // Send the Tx buffer
-  // TODO: Fix this to return something meaningful
-  return NULL;
+	_wire->setClock(_interfaceSpeed);			// Reset to the desired speed, in case other devices required a slowdown
+  	_wire->beginTransmission(deviceAddress);  	// Initialize the Tx buffer
+  	_wire->write(registerAddress);      		// Put slave register address in Tx buffer
+  	_wire->write(data);                 		// Put data in Tx buffer
+  	_wire->endTransmission();           		// Send the Tx buffer
+  	// TODO: Fix this to return something meaningful
+  	// return NULL; // In the meantime fix it to return the right type
+  	return 0;
 }
 
 // Read a byte from given register on device. Calls necessary SPI or I2C

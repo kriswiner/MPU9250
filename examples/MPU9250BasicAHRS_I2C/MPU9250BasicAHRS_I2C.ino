@@ -49,12 +49,12 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
 int intPin = 12;  // These can be changed, 2 and 3 are the Arduinos ext int pins
 int myLed  = 13;  // Set up pin 13 led for toggling
 
-#define I2C_clock 400000
-#define I2C_port Wire
+#define I2Cclock 400000
+#define I2Cport Wire
 #define MPU9250_ADDRESS MPU9250_ADDRESS_AD0   // Use either this line or the next to select which I2C address your device is using
 //#define MPU9250_ADDRESS MPU9250_ADDRESS_AD1
 
-MPU9250 myIMU(MPU9250_ADDRESS, I2C_port, I2C_clock);
+MPU9250 myIMU(MPU9250_ADDRESS, I2Cport, I2Cclock);
 
 void setup()
 {
