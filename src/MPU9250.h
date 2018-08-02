@@ -274,7 +274,7 @@ public:
     int16_t accelCount[3];
 
     // Public method declarations
-    MPU9250( int8_t _csPin, SPIClass &spiInterface = SPI, uint32_t spi_freq = SPI_DATA_RATE);
+    MPU9250( int8_t csPin, SPIClass &spiInterface = SPI, uint32_t spi_freq = SPI_DATA_RATE);
     MPU9250( uint8_t address = MPU9250_ADDRESS_AD0, TwoWire &wirePort = Wire, uint32_t clock_frequency = 100000 );
     void getMres();
     void getGres();
