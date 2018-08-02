@@ -42,7 +42,7 @@
 Adafruit_PCD8544 display = Adafruit_PCD8544(9, 8, 7, 5, 6);
 #endif // LCD
 
-#define AHRS true         // Set to false for basic data read
+#define AHRS false         // Set to false for basic data read
 #define SerialDebug true  // Set to true to get Serial output for debugging
 
 // Pin definitions

@@ -492,20 +492,20 @@ void MPU9250::MPU9250SelfTest(float * destination)
   float factoryTrim[6];
   uint8_t FS = GFS_250DPS;
    
-  writeByte(MPU9250_ADDRESS, SMPLRT_DIV, 0x00);    // Set gyro sample rate to 1 kHz
-  writeByte(MPU9250_ADDRESS, CONFIG, 0x02);        // Set gyro sample rate to 1 kHz and DLPF to 92 Hz
-  writeByte(MPU9250_ADDRESS, GYRO_CONFIG, FS<<3);  // Set full scale range for the gyro to 250 dps
-  writeByte(MPU9250_ADDRESS, ACCEL_CONFIG2, 0x02); // Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
-  writeByte(MPU9250_ADDRESS, ACCEL_CONFIG, FS<<3); // Set full scale range for the accelerometer to 2 g
+  writeByte(_I2Caddr, SMPLRT_DIV, 0x00);    // Set gyro sample rate to 1 kHz
+  writeByte(_I2Caddr, CONFIG, 0x02);        // Set gyro sample rate to 1 kHz and DLPF to 92 Hz
+  writeByte(_I2Caddr, GYRO_CONFIG, FS<<3);  // Set full scale range for the gyro to 250 dps
+  writeByte(_I2Caddr, ACCEL_CONFIG2, 0x02); // Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
+  writeByte(_I2Caddr, ACCEL_CONFIG, FS<<3); // Set full scale range for the accelerometer to 2 g
 
   for( int ii = 0; ii < 200; ii++) {  // get average current values of gyro and acclerometer
   
-    readBytes(MPU9250_ADDRESS, ACCEL_XOUT_H, 6, &rawData[0]);        // Read the six raw data registers into data array
+    readBytes(_I2Caddr, ACCEL_XOUT_H, 6, &rawData[0]);        // Read the six raw data registers into data array
     aAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
     aAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
     aAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
   
-    readBytes(MPU9250_ADDRESS, GYRO_XOUT_H, 6, &rawData[0]);       // Read the six raw data registers sequentially into data array
+    readBytes(_I2Caddr, GYRO_XOUT_H, 6, &rawData[0]);       // Read the six raw data registers sequentially into data array
     gAvg[0] += (int16_t)(((int16_t)rawData[0] << 8) | rawData[1]) ;  // Turn the MSB and LSB into a signed 16-bit value
     gAvg[1] += (int16_t)(((int16_t)rawData[2] << 8) | rawData[3]) ;  
     gAvg[2] += (int16_t)(((int16_t)rawData[4] << 8) | rawData[5]) ; 
