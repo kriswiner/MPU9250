@@ -22,6 +22,7 @@ MPU9250::MPU9250( int8_t csPin, SPIClass &spiInterface, uint32_t spi_freq )
     _spi->begin();
     pinMode(_csPin, OUTPUT);
     deselect();
+
 }
 MPU9250::MPU9250( uint8_t address, TwoWire &wirePort, uint32_t clock_frequency )
 {
@@ -35,6 +36,15 @@ MPU9250::MPU9250( uint8_t address, TwoWire &wirePort, uint32_t clock_frequency )
 
 	_wire->begin();
 	_wire->setClock(_interfaceSpeed);
+}
+
+void MPU9250::setupMagForSPI()
+{
+  // Use slave 4 for talking to the magnetometer
+  writeByteSPI(49, ((1 << 7) | AK8963_ADDRESS));    // Set the SLV_4_ADDR register to the magnetometer's address
+  writeByteSPI(52, 0b00000000);                     // Setup SLV_4 control as needed (but not set to do an operation yet)
+
+  writeByteSPI(36, 0b10000000);   // Enable the multi-master mode
 }
 
 void MPU9250::getMres()
@@ -198,6 +208,11 @@ void MPU9250::initAK8963(float * destination)
   // Set magnetometer data resolution and sample ODR
   writeByte(AK8963_ADDRESS, AK8963_CNTL, Mscale << 4 | Mmode);
   delay(10);
+
+  if(_csPin == NOT_SPI)
+  {
+    setupMagForSPI();
+  }
 }
 
 void MPU9250::initMPU9250()
@@ -275,6 +290,11 @@ void MPU9250::initMPU9250()
   // Enable data ready (bit 0) interrupt
   writeByte(_I2Caddr, INT_ENABLE, 0x01);
   delay(100);
+
+  if(_csPin == NOT_SPI)
+  {
+    setupMagForSPI();
+  }
 }
 
 
@@ -715,10 +735,10 @@ uint8_t MPU9250::writeByteSPI(uint8_t registerAddress, uint8_t writeData)
 
   deselect();
   _spi->endTransaction();
-#ifdef SERIAL_DEBUG
-  Serial.print("MPU9250::writeByteSPI slave returned: 0x");
-  Serial.println(returnVal, HEX);
-#endif
+// #ifdef SERIAL_DEBUG
+//   Serial.print("MPU9250::writeByteSPI slave returned: 0x");
+//   Serial.println(returnVal, HEX);
+// #endif
   return returnVal;
 }
 
@@ -741,12 +761,68 @@ uint8_t MPU9250::readByte(uint8_t deviceAddress, uint8_t registerAddress)
 {
   if (_csPin != NOT_SPI)
   {
-    return readByteSPI(registerAddress);
+    if(deviceAddress == AK8963_ADDRESS)
+    {
+      return readMagByteSPI(registerAddress);
+    }
+    else
+    {
+      return readByteSPI(registerAddress);
+    } 
   }
   else
   {
     return readByteWire(deviceAddress, registerAddress);
   }
+}
+
+uint8_t MPU9250::readMagByteSPI(uint8_t registerAddress)
+{
+  setupMagForSPI();
+
+  writeByteSPI(49, ((1 << 7) | AK8963_ADDRESS));
+  writeByteSPI(50, registerAddress);
+  writeByteSPI(52, 0b11000000);         // Command the read into I2C_SLV4_DI register, cause an interrupt when complete
+
+  // Wait for the data to be ready
+  uint8_t I2C_MASTER_STATUS = readByteSPI(54);
+
+  uint32_t count = 0;
+  while(((I2C_MASTER_STATUS & 0b01000000) == 0) && (count++ < 100000))            // Checks against the I2C_SLV4_DONE bit in the I2C master status register
+  {
+    I2C_MASTER_STATUS = readByteSPI(54);  
+  }
+  if(count > 10000)
+  {
+    Serial.println(F("Timed out"));
+  }
+  
+  
+
+
+  return readByteSPI(53);   // Read the data that is in the SLV4_DI register 
+}
+
+uint8_t MPU9250::writeMagByteSPI(uint8_t registerAddress, uint8_t data)
+{
+  setupMagForSPI();
+
+  writeByteSPI(49, ((1 << 7) | AK8963_ADDRESS));
+  writeByteSPI(50, registerAddress);
+  writeByteSPI(51, data);
+  writeByteSPI(52, 0b11000000);         // Command the read into I2C_SLV4_DI register, cause an interrupt when complete
+
+  uint8_t I2C_MASTER_STATUS = readByteSPI(54);
+  uint32_t count = 0;
+  while(((I2C_MASTER_STATUS & 0b01000000) == 0) && (count++ < 10000))            // Checks against the I2C_SLV4_DONE bit in the I2C master status register
+  {
+    I2C_MASTER_STATUS = readByteSPI(54);  
+  }
+  if(count > 10000)
+  {
+    Serial.println(F("Timed out"));
+  }
+  return 0x00;
 }
 
 // Read a byte from the given register address from device using I2C
@@ -822,10 +898,10 @@ uint8_t MPU9250::readBytesSPI(uint8_t registerAddress, uint8_t count,
   for (i = 0; i < count; i++)
   {
     dest[i] = _spi->transfer(0x00);
-#ifdef SERIAL_DEBUG
-    Serial.print("readBytesSPI::Read byte: 0x");
-    Serial.println(dest[i], HEX);
-#endif
+// #ifdef SERIAL_DEBUG
+//     Serial.print("readBytesSPI::Read byte: 0x");
+//     Serial.println(dest[i], HEX);
+// #endif
   }
 
   _spi->endTransaction();

@@ -185,6 +185,9 @@
 class MPU9250
 {
   protected:
+
+    public: // temporary
+
     // Set initial input parameters
     enum Ascale
     {
@@ -235,12 +238,15 @@ class MPU9250
 
     uint8_t writeByteWire(uint8_t, uint8_t, uint8_t);
     uint8_t writeByteSPI(uint8_t, uint8_t);
+    uint8_t writeMagByteSPI(uint8_t subAddress, uint8_t data);
     uint8_t readByteSPI(uint8_t subAddress);
+    uint8_t readMagByteSPI(uint8_t subAddress);
     uint8_t readByteWire(uint8_t address, uint8_t subAddress);
     bool magInit();
     void kickHardware();
     void select();
     void deselect();
+    void setupMagForSPI();
 // TODO: Remove this next line
 public:
     uint8_t ak8963WhoAmI_SPI();
