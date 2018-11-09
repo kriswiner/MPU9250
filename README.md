@@ -5,9 +5,9 @@ MPU-9250 9 DOF IMU Arduino Library
 
 [*MPU-9250 Breakout (SEN-13762)*](https://www.sparkfun.com/products/13762)
 
-This is an arduino IDE library to control the MPU-9250.
+This is an arduino IDE library to control and read from the MPU-9250. It provides access to accelerometer, gyroscope, and magnetometer sensor readings.  It should be compatible with any Arduino-compatible development board. It has been thoroughly tested with Arduino Pro Mini.
 
-This has been tested with Arduino Pro Mini.
+If you're looking for a more advanced library, which takes advantage of the MPU-9250's digital motion processing (DMP) features (tap-detection, pedometer, orientation, quaternion-calculation), and if you have a more advanced Arduino development board (e.g. [Arduino Zero](https://store.arduino.cc/usa/arduino-zero), [SparkFun SAMD21 Breakout](https://www.sparkfun.com/products/13664)), check out the [SparkFun MPU-9250 DMP Library](https://github.com/sparkfun/SparkFun_MPU-9250-DMP_Arduino_Library).
 
 Repository Contents
 -------------------
