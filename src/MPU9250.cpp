@@ -209,7 +209,7 @@ void MPU9250::initAK8963(float * destination)
   writeByte(AK8963_ADDRESS, AK8963_CNTL, Mscale << 4 | Mmode);
   delay(10);
 
-  if(_csPin == NOT_SPI)
+  if(_csPin != NOT_SPI)
   {
     setupMagForSPI();
   }
@@ -291,7 +291,7 @@ void MPU9250::initMPU9250()
   writeByte(_I2Caddr, INT_ENABLE, 0x01);
   delay(100);
 
-  if(_csPin == NOT_SPI)
+  if(_csPin != NOT_SPI)
   {
     setupMagForSPI();
   }
