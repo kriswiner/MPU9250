@@ -385,7 +385,7 @@ void MPU9250::initMPU9250(uint8_t MPUnum, uint8_t Ascale, uint8_t Gscale, uint8_
    delay(100);
 
   writeByte(MPUnum, USER_CTRL, 0x20);          // Enable I2C Master mode  
-  writeByte(MPUnum, I2C_MST_CTRL, 0x0D);       // I2C configuration multi-master I2C 400KHz
+  writeByte(MPUnum, I2C_MST_CTRL, 0x1D);       // I2C configuration STOP after each transaction, master I2C bus at 400 KHz
   writeByte(MPUnum, I2C_MST_DELAY_CTRL, 0x81); // Use blocking data retreival and enable delay for mag sample rate mismatch
   writeByte(MPUnum, I2C_SLV4_CTRL, 0x01);      // Delay mag data retrieval to once every other accel/gyro data sample
 }
