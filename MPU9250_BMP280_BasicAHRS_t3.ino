@@ -3,6 +3,18 @@
  date: April 1, 2014
  license: Beerware - Use this code however you'd like. If you 
  find it useful you can buy me a beer some time.
+ from: 
+
+ modified by: David Mckenzie
+ date: 2018/03/25
+ change log: update to enable use of Arduino Nano
+             use #def and strings to decrease duplicate code and decrease firmware/on-chip size
+             converted altitude estimation to metres
+             Serial.print data in a table format to enable easy comparison of changes
+             increase initial USER hard calibation variables
+             PS the code looks dramatically messier than the original due to large number of #ifdefs...
+             
+  
  
  Demonstrate basic MPU-9250 functionality including parameterizing the register addresses, initializing the sensor, 
  getting properly scaled accelerometer, gyroscope, and magnetometer data out. Added display functions to 
@@ -30,10 +42,62 @@
  Because the sensor is not 5V tolerant, we are using a 3.3 V 8 MHz Pro Mini or a 3.3 V Teensy 3.1.
  We have disabled the internal pull-ups used by the Wire library in the Wire.h/twi.c utility file.
  We are also using the 400 kHz fast I2C mode by setting the TWI_FREQ  to 400000L /twi.h utility file.
+
+ 
+ Nano and Purple Chinese GY-91 Hardware wiring setup:
+ Nano --------- GY-91
+ 3V3 ----------- 3V3
+ GND ----------- GND
+ A4 (SDA) ------ SDA
+ A5 (SCL) ------ SCL
+ 
+ 
  */
-//#include "Wire.h"   
-#include <i2c_t3.h>
+
+// NB the Nano doesn't have enough memory to have verboseStartup and SerialOutput both enabled
+// (and barely enough to manage the verboseStartup - you might need to cut the text down to add more code)
+// you will have to use verboseStartup for debugging and when this is working enable the Serial Output
+#define verboseStartup   // comment this out if you want to save dynamic memory by minimising printed strings in the setup function
+//#define SerialOutput   // comment out this def to stop Serial output
+//#define tableOutput   // comment this out if you want verbose output (SerialOutput must be enabled for this to have any effect)
+
+
+#define LOCAL_DECLINATION -0.4833333
+                        // this must be DECIMAL declination but you can calculate from degrees, minutes, seconds using formula -0° + -29'/60 + 0"/3600   
+                        // Declination is a conversion factor to convert current magnetic north to true north
+                        // To increase accuracy you can calibrate with your magnetic declination from http://www.magnetic-declination.com/
+#define STARTUP_ALTITUDE 91     // altitude in metres (multiply by 3.28084 to get feet)
+#define STARTUP_PRESSURE 1011   // TODO: calibrate not used - mBar = hectaPascals        // available from  https://www.metoffice.gov.uk/public/weather/observation/gcpdvn11m
+
+
+//#define AHRS true         // comment out for basic data read
+//#define DisplayOutput   // comment out this def to stop Display output
+//#define tw3             // comment out if you dont want to use the teensy wiring extension
+
+// Nano, ADO is set to 0 
+// Using the MPU9250Teensy 3.1 Add-On shield, ADO is set to 0 
+// Using the MSENSR-9250 breakout board, ADO is set to 0 
+// Teensy without ADO is set to 1
+// Seven-bit device address is 110100 for ADO = 0 and 110101 for ADO = 1
+#define ADO 0
+
+#if ADO
+#define MPU9250_ADDRESS 0x69  // Device address when ADO = 1
+#define BMP280_ADDRESS 0x77        // Address of BMP280 altimeter 
+#else
+#define MPU9250_ADDRESS 0x68  // Device address when ADO = 0
+#define AK8963_ADDRESS 0x0C   //  Address of magnetometer
+#define BMP280_ADDRESS 0x76        // Address of BMP280 altimeter 
+#endif  
+
+
+#define I2C_NOSTOP false
+ 
+#include "Wire.h"   
+//DGM#include <i2c_t3.h>
 #include <SPI.h>
+//DGM#include <Adafruit_GFX.h>
+//DGM#include <Adafruit_PCD8544.h>
 
 // See also MPU-9250 Register Map and Descriptions, Revision 4.0, RM-MPU-9250A-00, Rev. 1.4, 9/9/2013 for registers not listed in 
 // above document; the MPU9250 and MPU9150 are virtually identical but the latter has a different register map
@@ -188,11 +252,6 @@
 #define BMP280_ID         0xD0  // should be 0x58
 #define BMP280_CALIB00    0x88
 
-#define MPU9250_ADDRESS 0x68       // MPU9250 address when ADO = 1
-#define AK8963_ADDRESS 0x0C        // Address of AK8963 (MPU9250) magnetometer
-#define BMP280_ADDRESS 0x77        // Address of BMP280 altimeter 
-
-#define SerialDebug true  // set to true to get Serial output for debugging
 
 // Set initial input parameters
 enum MPU9250Ascale {
@@ -316,104 +375,163 @@ float lin_ax, lin_ay, lin_az;             // linear acceleration (acceleration w
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
+float startupAltitude = 0;        // float to hold startup Altitude
+
+#ifdef tableOutput
+char header1[] = "Accelerometer                |Gyroscope                      |Magnetometer         |Quaternian                   |AHRS                        |Gryo Chip |Grav_x, Grav_y, Grav_z:       | Lin_ax, Lin_ay, Lin_az:      |Data      |BMP280  | Pressure  | Altitude";
+char header2[] = "ax:      ay:      az (mg):   |  gx:     gy:     gz (°/s):   | mx:   my:   mz: (mG)|  q0:   qx:   qy:   qz:      | Yaw, Pitch, Roll:          |Temp (°C)|                              |                              |Rate (Hz):|Temp(C) | hPa = mbar| m";
+int loopCount = 0;
+#endif
 
 void setup()
 {
-//  Wire.begin();
-//  TWBR = 12;  // 400 kbit/sec I2C speed for Pro Mini
+#ifndef tw3
+  Wire.begin();  
+#else
+  // TWBR = 12;  // 400 kbit/sec I2C speed for Pro Mini
   // Setup for Master mode, pins 18/19, external pullups, 400kHz for Teensy 3.1
   Wire.begin(I2C_MASTER, 0x00, I2C_PINS_16_17, I2C_PULLUP_EXT, I2C_RATE_400);
+#endif    //tw3
   Serial.begin(38400);
-  delay(4000);
+//  delay(4000);
   
   // Set up the interrupt pin, its set as active high, push-pull
   pinMode(myLed, OUTPUT);
   digitalWrite(myLed, HIGH);
   
-  delay(1000);
+//  delay(1000);
 
   I2Cscan();// look for I2C devices on the bus
     
-  // Read the WHO_AM_I register, this is a good test of communication
+#ifdef verboseStartup
   Serial.println("MPU9250 9-axis motion sensor...");
+#endif
+  // Read the WHO_AM_I register, this is a good test of communication
   byte c = readByte(MPU9250_ADDRESS, MPU9250_WHO_AM_I);  // Read WHO_AM_I register for MPU-9250
+#ifdef verboseStartup
   Serial.print("MPU9250 "); Serial.print("I AM "); Serial.print(c, HEX); Serial.print(" I should be "); Serial.println(0x71, HEX);
-
-  delay(1000); 
+#endif
+//  delay(1000); 
 
   if (c == 0x71) // WHO_AM_I should always be 0x68
   {  
+#ifdef verboseStartup
     Serial.println("MPU9250 is online...");
+#endif
     
     MPU9250SelfTest(SelfTest); // Start by performing self test and reporting values
+#ifndef verboseStartup
+    Serial.println("MPU9250 OK");
+#else
+    char selftestStr[] = "-axis self test: ";
+    char accelStr[] = "acceleration";
+    char gyrStr[] = "gyration";
+    char trimStr[] = " trim within : ";
+    char factStr[] = "% of factory value";
     Serial.println("MPU9250 Self Test:");
-    Serial.print("x-axis self test: acceleration trim within : "); Serial.print(SelfTest[0],1); Serial.println("% of factory value");
-    Serial.print("y-axis self test: acceleration trim within : "); Serial.print(SelfTest[1],1); Serial.println("% of factory value");
-    Serial.print("z-axis self test: acceleration trim within : "); Serial.print(SelfTest[2],1); Serial.println("% of factory value");
-    Serial.print("x-axis self test: gyration trim within : "); Serial.print(SelfTest[3],1); Serial.println("% of factory value");
-    Serial.print("y-axis self test: gyration trim within : "); Serial.print(SelfTest[4],1); Serial.println("% of factory value");
-    Serial.print("z-axis self test: gyration trim within : "); Serial.print(SelfTest[5],1); Serial.println("% of factory value");
+    Serial.print("x");Serial.print(selftestStr);Serial.print(accelStr);Serial.print(trimStr); Serial.print(SelfTest[0],1); Serial.println(factStr);
+    Serial.print("y");Serial.print(selftestStr);Serial.print(accelStr);Serial.print(trimStr); Serial.print(SelfTest[1],1); Serial.println(factStr);
+    Serial.print("z");Serial.print(selftestStr);Serial.print(accelStr);Serial.print(trimStr); Serial.print(SelfTest[2],1); Serial.println(factStr);
+    Serial.print("x");Serial.print(selftestStr);Serial.print(gyrStr);Serial.print(trimStr); Serial.print(SelfTest[3],1); Serial.println(factStr);
+    Serial.print("y");Serial.print(selftestStr);Serial.print(gyrStr);Serial.print(trimStr); Serial.print(SelfTest[4],1); Serial.println(factStr);
+    Serial.print("z");Serial.print(selftestStr);Serial.print(gyrStr);Serial.print(trimStr); Serial.print(SelfTest[5],1); Serial.println(factStr);
     delay(1000);
+#endif    // verboseStartup
     
-   // get sensor resolutions, only need to do this once
-   MPU9250getAres();
-   MPU9250getGres();
-   MPU9250getMres();
+     // get sensor resolutions, only need to do this once
+     MPU9250getAres();
+     MPU9250getGres();
+     MPU9250getMres();
     
-   Serial.println(" Calibrate MPU9250 gyro and accel");
-   accelgyrocalMPU9250(MPU9250gyroBias, MPU9250accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
-   Serial.println("accel biases (mg)"); Serial.println(1000.*MPU9250accelBias[0]); Serial.println(1000.*MPU9250accelBias[1]); Serial.println(1000.*MPU9250accelBias[2]);
-   Serial.println("gyro biases (dps)"); Serial.println(MPU9250gyroBias[0]); Serial.println(MPU9250gyroBias[1]); Serial.println(MPU9250gyroBias[2]);
+#ifdef verboseStartup
+     Serial.println(" Calibrate MPU9250 gyro and accel");
+#endif
+     accelgyrocalMPU9250(MPU9250gyroBias, MPU9250accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
+#ifdef verboseStartup
+     Serial.println("accel biases (mg)"); Serial.println(1000.*MPU9250accelBias[0]); Serial.println(1000.*MPU9250accelBias[1]); Serial.println(1000.*MPU9250accelBias[2]);
+     Serial.println("gyro biases (dps)"); Serial.println(MPU9250gyroBias[0]); Serial.println(MPU9250gyroBias[1]); Serial.println(MPU9250gyroBias[2]);
+#endif
 
-  delay(1000);  
+//    delay(1000);  
    
-  initMPU9250(); 
-  Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+    initMPU9250(); 
+#ifdef verboseStartup
+    Serial.println("MPU9250 inited"); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+//    Serial.println("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
+#endif
   
-  // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
-  byte d = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for AK8963
-  Serial.print("AK8963 "); Serial.print("I AM "); Serial.print(d, HEX); Serial.print(" I should be "); Serial.println(0x48, HEX);
-
-  delay(1000); 
+    // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
+    byte d = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for AK8963
+#ifdef verboseStartup
+    Serial.print("AK8963 "); Serial.print("I AM "); Serial.print(d, HEX); Serial.print(" I should be "); Serial.println(0x48, HEX);
+#endif
+//    delay(1000); 
   
-  // Get magnetometer calibration from AK8963 ROM
-  initAK8963(magCalibration); Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
+    // Get magnetometer calibration from AK8963 ROM
+    initAK8963(magCalibration); 
+#ifdef verboseStartup
+    Serial.println("AK8963 inited"); // Initialize device for active mode read of magnetometer
+//    Serial.println("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
+#endif
   
-  magcalMPU9250(MPU9250magBias);
-  Serial.println("AK8963 mag biases (mG)"); Serial.println(MPU9250magBias[0]); Serial.println(MPU9250magBias[1]); Serial.println(MPU9250magBias[2]); 
-  delay(2000); // add delay to see results before serial spew of data
-   
-  if(SerialDebug) {
-  Serial.print("X-Axis sensitivity adjustment value "); Serial.println(magCalibration[0], 2);
-  Serial.print("Y-Axis sensitivity adjustment value "); Serial.println(magCalibration[1], 2);
-  Serial.print("Z-Axis sensitivity adjustment value "); Serial.println(magCalibration[2], 2);
-  }
-  
-  delay(1000);  
-  
-    }
-  else
-  {
+    magcalMPU9250(MPU9250magBias);
+#ifdef verboseStartup
+    Serial.println("AK8963 mag biases (mG)"); Serial.println(MPU9250magBias[0]); Serial.println(MPU9250magBias[1]); Serial.println(MPU9250magBias[2]); 
+    delay(2000); // add delay to see results before serial spew of data
+    char senAdj[] = "-Axis sensitivity adjustment value ";
+    Serial.print("X");Serial.print(senAdj); Serial.println(magCalibration[0], 2);
+    Serial.print("Y");Serial.print(senAdj); Serial.println(magCalibration[1], 2);
+    Serial.print("Z");Serial.print(senAdj); Serial.println(magCalibration[2], 2);
+//    delay(1000);  
+#else
+    Serial.println("AK8963 OK");
+#endif
+  } else {
+#ifdef verboseStartup
     Serial.print("Could not connect to MPU9250: 0x");
     Serial.println(c, HEX);
-    while(1) ; // Loop forever if communication doesn't happen
+#endif
+//    while(1) ; // Loop forever if communication doesn't happen
   }
   
   // Read the WHO_AM_I register of the BMP280 this is a good test of communication
   byte f = readByte(BMP280_ADDRESS, BMP280_ID);  // Read WHO_AM_I register for BMP280
-  Serial.print("BMP280 "); 
-  Serial.print("I AM "); 
-  Serial.print(f, HEX); 
-  Serial.print(" I should be "); 
-  Serial.println(0x58, HEX);
-  Serial.println(" ");
-
-  delay(1000); 
+#ifdef verboseStartup
+  Serial.print("BMP280 "); Serial.print("I AM "); Serial.print(f, HEX); Serial.print(" I should be "); Serial.println(0x58, HEX); Serial.println(" ");
+#endif
+//  delay(1000); 
 
   writeByte(BMP280_ADDRESS, BMP280_RESET, 0xB6); // reset BMP280 before initilization
   delay(100);
 
   BMP280Init(); // Initialize BMP280 altimeter
+
+  // Pressure correction requires temperature, so do this first
+  for (int i=0; i< 100; i++) { 
+    // Pressure must be corrected for temperature, so check this first
+    rawTemp =   readBMP280Temperature();
+    BMP280Temperature = (float) bmp280_compensate_T(rawTemp)/100.;
+
+    rawPress =  readBMP280Pressure();
+    BMP280Pressure = (float) bmp280_compensate_P(rawPress)/25600.; // Pressure in hPa=mbar
+  }  
+
+#ifdef verboseStartup
+  char BMPStStr[]= "Startup ";
+  char BMPTempStr[] = "Temp: ";
+  char BMPPressStr[] = "Pressure: ";
+  char BMPAltFromStr[] = "Altitude from ";
+  char BMPMeasPresStr[] = "measured pressure: ";
+  Serial.print(BMPStr); Serial.print(BMPStStr); Serial.print(BMPTempStr); Serial.print(BMP280Temperature); Serial.println("C");
+  Serial.print(BMPStr); Serial.print(BMPStStr); Serial.print(BMPPressStr); Serial.print(BMP280Pressure); Serial.println("hPa=mbar");
+  Serial.print(BMPStr); Serial.print(BMPAltFromStr); Serial.print("STARTUP_PRESSURE: "); Serial.print(calcAltitude(STARTUP_PRESSURE)); Serial.println("m");
+  
+  startupAltitude = calcAltitude(BMP280Pressure);
+  Serial.print(BMPAltFromStr); Serial.print(BMPStr); Serial.print(BMPMeasPresStr); Serial.print(startupAltitude); Serial.println("m (abs)");
+
+  startupAltitude = startupAltitude - STARTUP_ALTITUDE;
+  Serial.print(BMPAltFromStr); Serial.print(BMPStr); Serial.print(BMPMeasPresStr); Serial.print(startupAltitude); Serial.println("m (cf STARTUP_ALTITUDE) - loop readings will be compensated by this difference");
+
   Serial.println("BMP280 Calibration coeficients:");
   Serial.print("dig_T1 ="); 
   Serial.println(dig_T1);
@@ -439,11 +557,21 @@ void setup()
   Serial.println(dig_P8);
   Serial.print("dig_P9 ="); 
   Serial.println(dig_P9);
+#else
+  startupAltitude = calcAltitude(BMP280Pressure) - STARTUP_ALTITUDE;
+  Serial.println("BMP280 OK");
+#endif
+
+#ifdef tableOutput
+    Serial.println(header1);
+    Serial.println(header2); 
+#endif    // tableOutput
  
 }
 
 void loop()
 {  
+
   //MPU9250
   // If intPin goes high, all data registers have new data
   if (readByte(MPU9250_ADDRESS, MPU9250_INT_STATUS) & 0x01) {  // check if data ready interrupt
@@ -468,7 +596,7 @@ void loop()
     mx = (float)magCount[0]*MPU9250mRes*magCalibration[0] - MPU9250magBias[0];  // get actual magnetometer value, this depends on scale being set
     my = (float)magCount[1]*MPU9250mRes*magCalibration[1] - MPU9250magBias[1];  
     mz = (float)magCount[2]*MPU9250mRes*magCalibration[2] - MPU9250magBias[2];   
-   }
+  }
   
   Now = micros();
   deltat = ((Now - lastUpdate)/1000000.0f); // set integration time by time elapsed since last filter update
@@ -486,61 +614,16 @@ void loop()
   // function to get North along the accel +x-axis, East along the accel -y-axis, and Down along the accel -z-axis.
   // This orientation choice can be modified to allow any convenient (non-NED) orientation convention.
   // Pass gyro rate as rad/s
-    MadgwickQuaternionUpdate(-ax, ay, az, gx*pi/180.0f, -gy*pi/180.0f, -gz*pi/180.0f,  my,  -mx, mz);
+  MadgwickQuaternionUpdate(-ax, ay, az, gx*pi/180.0f, -gy*pi/180.0f, -gz*pi/180.0f,  my,  -mx, mz);
 //  MahonyQuaternionUpdate(-ax, ay, az, gx*pi/180.0f, -gy*pi/180.0f, -gz*pi/180.0f,  my,  -mx, mz);
 
-    // Serial print and/or display at 0.5 s rate independent of data rates
-    delt_t = millis() - count;
-    if (delt_t > 500) { // update LCD once per half-second independent of read rate
-
-    if(SerialDebug) {
-     Serial.println("MPU9250: ");
-    Serial.print("ax = "); Serial.print((int)1000*ax);  
-    Serial.print(" ay = "); Serial.print((int)1000*ay); 
-    Serial.print(" az = "); Serial.print((int)1000*az); Serial.println(" mg");
-    Serial.print("gx = "); Serial.print( gx, 2); 
-    Serial.print(" gy = "); Serial.print( gy, 2); 
-    Serial.print(" gz = "); Serial.print( gz, 2); Serial.println(" deg/s");
-    Serial.print("mx = "); Serial.print( (int)mx ); 
-    Serial.print(" my = "); Serial.print( (int)my ); 
-    Serial.print(" mz = "); Serial.print( (int)mz ); Serial.println(" mG");
-    
-    Serial.print("q0 = "); Serial.print(q[0]);
-    Serial.print(" qx = "); Serial.print(q[1]); 
-    Serial.print(" qy = "); Serial.print(q[2]); 
-    Serial.print(" qz = "); Serial.println(q[3]); 
-    }               
+  // Serial print and/or display at 0.5 s rate independent of data rates
+  delt_t = millis() - count;
+ //count = millis(); 
+  if (delt_t > 500) { // output data once per half-second independent of read rate
     tempCount = MPU9250readTempData();  // Read the gyro adc values
     temperature = ((float) tempCount) / 333.87 + 21.0; // Gyro chip temperature in degrees Centigrade
-   // Print temperature in degrees Centigrade      
-   if(SerialDebug) {
-     Serial.print("MPU9250 Gyro temperature is ");  Serial.print(temperature, 1);  Serial.println(" degrees C"); // Print T values to tenths of s degree C
-   }
-   
-    rawPress =  readBMP280Pressure();
-    BMP280Pressure = (float) bmp280_compensate_P(rawPress)/25600.; // Prwssure in mbar
-    rawTemp =   readBMP280Temperature();
-    BMP280Temperature = (float) bmp280_compensate_T(rawTemp)/100.;
 
-    altitude = 145366.45f*(1.0f - pow((BMP280Pressure/1013.25f), 0.190284f));
-
-    if(SerialDebug) {
-      Serial.println("BMP280:");
-      Serial.print("Altimeter temperature = "); 
-      Serial.print( BMP280Temperature, 2); 
-      Serial.println(" C"); // temperature in degrees Celsius
-      Serial.print("Altimeter temperature = "); 
-      Serial.print(9.*BMP280Temperature/5. + 32., 2); 
-      Serial.println(" F"); // temperature in degrees Fahrenheit
-      Serial.print("Altimeter pressure = "); 
-      Serial.print(BMP280Pressure, 2);  
-      Serial.println(" mbar");// pressure in millibar
-      Serial.print("Altitude = "); 
-      Serial.print(altitude, 2); 
-      Serial.println(" feet");
-      Serial.println(" ");
-    }
-      
    // Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
   // In this coordinate system, the positive z-axis is down toward Earth. 
   // Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
@@ -569,13 +652,115 @@ void loop()
     yaw   = atan2f(a12, a22);
     pitch *= 180.0f / PI;
     yaw   *= 180.0f / PI; 
-    yaw   += 13.8f; // Declination at Danville, California is 13 degrees 48 minutes and 47 seconds on 2014-04-04
+    yaw   -= LOCAL_DECLINATION; // Modification factor to convert current magnetic north to true north
     if(yaw < 0) yaw   += 360.0f; // Ensure yaw stays between 0 and 360
     roll  *= 180.0f / PI;
     lin_ax = ax + a31;
     lin_ay = ay + a32;
     lin_az = az - a33;
-    if(SerialDebug) {
+
+    rawPress =  readBMP280Pressure();
+    BMP280Pressure = (float) bmp280_compensate_P(rawPress)/25600.; // Pressure in hPa=mbar
+
+    rawTemp =   readBMP280Temperature();
+    BMP280Temperature = (float) bmp280_compensate_T(rawTemp)/100.;
+
+    altitude = calcAltitude(BMP280Pressure) - startupAltitude;
+
+
+#ifdef SerialOutput
+#ifdef tableOutput
+
+    loopCount++;
+    if (loopCount >40) {
+      loopCount = 0;
+      Serial.println(header1);
+      Serial.println(header2); 
+    }
+
+    // Print acceleration values in milligs!
+    serialPad(ax*1000, 2, true);
+    serialPad(ay*1000, 2, true);
+    serialPad(az*1000, 2, false);
+    Serial.print("mg | ");
+    
+    // Print gyro values in degree/sec
+    serialPad( gx, 2, true);   
+    serialPad( gy, 2, true);   
+    serialPad( gz, 2, false);
+    Serial.print("d/s | ");
+
+    // Print mag values in degree/sec
+    serialPad(mx, 0, true);  
+    serialPad(my, 0, true);  
+    serialPad(mz, 0, false);
+    Serial.print("mG | ");
+
+    if (q[0] < 0) { Serial.print(" ");}  else { Serial.print("  ");}       Serial.print(q[0], 2);  
+    if (q[1] < 0) { Serial.print(", ");} else { Serial.print(",  ");}      Serial.print(q[1], 2);   
+    if (q[2] < 0) { Serial.print(", ");} else { Serial.print(",  ");}      Serial.print(q[2], 2);   
+    if (q[3] < 0) { Serial.print(", ");} else { Serial.print(",  ");}      Serial.print(q[3], 2);  
+    Serial.print(" | ");
+    
+    serialPad(yaw, 2, true);
+    serialPad(pitch, 2, true);
+    serialPad(roll, 2, false);
+    Serial.print(" | ");
+
+    // Print MPU9250 chip temperature in degrees Centigrade to tenths of s degree C (assuming temp will always be > 10 and <100, so no padding)
+    Serial.print(temperature, 1);
+    Serial.print("     | ");
+    
+//    Serial.print("Grav_x, Grav_y, Grav_z: ");
+    serialPad(-a31*1000, 2, true);
+    serialPad(-a32*1000, 2, false);
+    serialPad(a33*1000, 2, false);
+    Serial.print(" mg | ");
+//    Serial.print("Lin_ax, Lin_ay, Lin_az: ");
+    serialPad(lin_ax*1000, 2, true);
+    serialPad(lin_ay*1000, 2, false);
+    serialPad(lin_az*1000, 2, false);
+    Serial.print(" mg | ");
+
+    // Print operating frequency (Hz)
+    Serial.print((float)sumCount/sum, 2);
+    Serial.print("Hz | ");
+
+//    Serial.print("BMP280:");
+//    Serial.print("Altimeter temperature = "); 
+    Serial.print( BMP280Temperature, 2); 
+    Serial.print("C |"); // temperature in degrees Celsius
+//    Serial.print("Altimeter temperature = "); 
+//    Serial.print(9.*BMP280Temperature/5. + 32., 2); 
+//    Serial.println(" F"); // temperature in degrees Fahrenheit
+    Serial.print(BMP280Pressure, 2);  // Altimeter pressure in millibar
+    Serial.print("hPa |"); // pressure in hPa=mbar
+//    Serial.print(altitude, 2); // Altitude in feet");
+    Serial.print(altitude, 2); // Altitude in metres");
+    Serial.println("m");
+#else  // ifndef  tableOutput
+    Serial.println("MPU9250: ");
+    // Print acceleration values in milligs!
+    Serial.print("ax = "); Serial.print((int)1000*ax);  
+    Serial.print(" ay = "); Serial.print((int)1000*ay); 
+    Serial.print(" az = "); Serial.print((int)1000*az); Serial.println(" mg");
+    // Print gyro values in degree/sec
+    Serial.print("gx = "); Serial.print( gx, 2); 
+    Serial.print(" gy = "); Serial.print( gy, 2); 
+    Serial.print(" gz = "); Serial.print( gz, 2); Serial.println(" deg/s");
+    // Print mag values in degree/sec
+    Serial.print("mx = "); Serial.print( (int)mx ); 
+    Serial.print(" my = "); Serial.print( (int)my ); 
+    Serial.print(" mz = "); Serial.print( (int)mz ); Serial.println(" mG");
+    
+    Serial.print("q0 = "); Serial.print(q[0]);
+    Serial.print(" qx = "); Serial.print(q[1]); 
+    Serial.print(" qy = "); Serial.print(q[2]); 
+    Serial.print(" qz = "); Serial.println(q[3]); 
+
+   // Print temperature in degrees Centigrade      
+    Serial.print("Gyro temp = ");  Serial.print(temperature, 1);  Serial.println("C"); // Print T values to tenths of s degree C
+
     Serial.print("Yaw, Pitch, Roll: ");
     Serial.print(yaw, 2);
     Serial.print(", ");
@@ -596,15 +781,33 @@ void loop()
     Serial.print(", ");
     Serial.print(lin_az*1000, 2);  Serial.println(" mg");
     
+    // Print operating frequency (Hz)
     Serial.print("rate = "); Serial.print((float)sumCount/sum, 2); Serial.println(" Hz");
-    }
+
+    Serial.println("BMP280:");
+    Serial.print("Altimeter temperature = "); 
+    Serial.print( BMP280Temperature, 2); 
+    Serial.println(" C"); // temperature in degrees Celsius
+    Serial.print("Altimeter temperature = "); 
+    Serial.print(9.*BMP280Temperature/5. + 32., 2); 
+    Serial.println(" F"); // temperature in degrees Fahrenheit
+    Serial.print("Altimeter pressure = "); 
+    Serial.print(BMP280Pressure, 2);  
+    Serial.println(" hPa=mbar");// pressure in hPa=millibar
+    Serial.print("Altitude = "); 
+    Serial.print(altitude, 2); 
+    Serial.println(" metres");
+    Serial.println("");
+
+#endif  // tableOutput
+#endif  // SerialOutput
+      
 
     digitalWrite(myLed, !digitalRead(myLed));
     count = millis(); 
     sumCount = 0;
     sum = 0;    
-    }
-
+  }
 }
 
 //===================================================================================================================
@@ -941,8 +1144,10 @@ void magcalMPU9250(float * dest1)
   int32_t mag_bias[3] = {0, 0, 0};
   int16_t mag_max[3] = {-32767, -32767, -32767}, mag_min[3] = {32767, 32767, 32767}, mag_temp[3] = {0, 0, 0};
  
+#ifdef verboseStartup
   Serial.println("Mag Calibration: Wave device in a figure eight until done!");
-  delay(4000);
+//  delay(4000);
+#endif
   
    sample_count = 64;
    for(ii = 0; ii < sample_count; ii++) {
@@ -966,7 +1171,9 @@ void magcalMPU9250(float * dest1)
     dest1[1] = (float) mag_bias[1]*MPU9250mRes*magCalibration[1];   
     dest1[2] = (float) mag_bias[2]*MPU9250mRes*magCalibration[2];          
 
+#ifdef verboseStartup
    Serial.println("Mag Calibration done!");
+#endif
 }
 
 
@@ -1110,6 +1317,16 @@ int32_t readBMP280Pressure()
   return (int32_t) (((int32_t) rawData[0] << 16 | (int32_t) rawData[1] << 8 | rawData[2]) >> 4);
 }
 
+float calcAltitude (float localPressure) {
+  return 44330.00f*(1.0f - pow((localPressure/1013.25f), 0.190294957f));    // Altitude at startup (in metres)
+                                                                                  // see https://forum.arduino.cc/index.php?topic=308629.0
+                                                                                  //h = 44330 * [ 1 - ( p / p0 ) ^ ( 1 / 5.255) ]
+                                                                                  //The constant 44330 is calculated assuming that the atmospheric temperature is 15 C at sea level, and that the temperature decreases with altitude by 6.5 K/km.
+                                                                                  //h = altitude (m)
+                                                                                  //p = measured pressure (Pa)
+                                                                                  //p0 = reference pressure at sea level (assummed 1013.25).
+}
+
 
 void BMP280Init()
 {
@@ -1143,7 +1360,7 @@ void I2Cscan()
   byte error, address;
   uint16_t nDevices;
 
-  Serial.println("Scanning...");
+  Serial.println("Scanning I2C Bus...");
 
   nDevices = 0;
   for(address = 1; address < 127; address++ ) 
@@ -1154,6 +1371,9 @@ void I2Cscan()
     Wire.beginTransmission(address);
     error = Wire.endTransmission();
 
+    if (error == 0) nDevices++;
+      
+#ifdef verboseStartup
     if (error == 0)
     {
       Serial.print("I2C device found at address 0x");
@@ -1162,7 +1382,6 @@ void I2Cscan()
       Serial.print(address,HEX);
       Serial.println("  !");
 
-      nDevices++;
     }
     else if (error==4) 
     {
@@ -1171,18 +1390,19 @@ void I2Cscan()
         Serial.print("0");
       Serial.println(address,HEX);
     }    
+#endif    // verboseStartup    
   }
+#ifdef verboseStartup
   if (nDevices == 0)
     Serial.println("No I2C devices found\n");
   else
     Serial.println("done\n");
-    
+#endif    // verboseStartup    
 }
 
 
 // I2C read/write functions for the MPU9250 and AK8963 sensors
-
-        void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
+void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
 {
 	Wire.beginTransmission(address);  // Initialize the Tx buffer
 	Wire.write(subAddress);           // Put slave register address in Tx buffer
@@ -1190,7 +1410,7 @@ void I2Cscan()
 	Wire.endTransmission();           // Send the Tx buffer
 }
 
-        uint8_t readByte(uint8_t address, uint8_t subAddress)
+uint8_t readByte(uint8_t address, uint8_t subAddress)
 {
 	uint8_t data; // `data` will store the register data	 
 	Wire.beginTransmission(address);         // Initialize the Tx buffer
@@ -1203,7 +1423,7 @@ void I2Cscan()
 	return data;                             // Return data read from slave register
 }
 
-        void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest)
+void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest)
 {  
 	Wire.beginTransmission(address);   // Initialize the Tx buffer
 	Wire.write(subAddress);            // Put slave register address in Tx buffer
@@ -1214,4 +1434,21 @@ void I2Cscan()
         Wire.requestFrom(address, (size_t) count);  // Read bytes from slave register address 
 	while (Wire.available()) {
         dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
+}
+
+
+
+int serialPad(float valToPrint, int len, bool comma) {
+  if (valToPrint >= 0) {Serial.print(" ");}
+  if ((valToPrint >= 1000) or (valToPrint <= -1000)) {
+    // do nothing
+  } else if ((valToPrint >= 100) or (valToPrint <= -100)) {
+    Serial.print(" ");
+  } else if ((valToPrint >= 10) or (valToPrint <= -10)) {
+    Serial.print("  ");
+  } else {
+    Serial.print("   ");
+  }
+  Serial.print(valToPrint, len);
+  if (comma) {Serial.print(",");}
 }
