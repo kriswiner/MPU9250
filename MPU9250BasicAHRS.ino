@@ -429,8 +429,8 @@ void loop()
   // in the LSM9DS0 sensor. This rotation can be modified to allow any convenient orientation convention.
   // This is ok by aircraft orientation standards!  
   // Pass gyro rate as rad/s
-//  MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
-  MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
+//  MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, -mz);
+  MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, -mz);
 
 
     if (!AHRS) {
